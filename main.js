@@ -82,6 +82,90 @@ let updaterConfigured =
     false;
 
 
+let updaterInstalling =
+    false;
+
+
+let updaterState = {
+
+    status:
+        "idle",
+
+    currentVersion:
+        null,
+
+    availableVersion:
+        null,
+
+    percent:
+        0,
+
+    transferred:
+        0,
+
+    total:
+        0,
+
+    bytesPerSecond:
+        0,
+
+    error:
+        null
+};
+
+
+function getUpdaterState() {
+
+    return {
+        ...updaterState,
+
+        currentVersion:
+            app.getVersion(),
+
+        packaged:
+        app.isPackaged
+    };
+}
+
+
+function sendUpdaterState() {
+
+    updaterState.currentVersion =
+        app.getVersion();
+
+
+    if (
+        mainWindow &&
+        !mainWindow.isDestroyed()
+    ) {
+
+        mainWindow
+            .webContents
+            .send(
+                "updater:state",
+                getUpdaterState()
+            );
+    }
+}
+
+
+function setUpdaterState(
+    patch
+) {
+
+    updaterState = {
+        ...updaterState,
+        ...patch,
+
+        currentVersion:
+            app.getVersion()
+    };
+
+
+    sendUpdaterState();
+}
+
+
 function configureAutoUpdater() {
 
     if (
@@ -96,15 +180,16 @@ function configureAutoUpdater() {
         true;
 
 
+    updaterState.currentVersion =
+        app.getVersion();
+
+
     /*
-     * Em desenvolvimento:
+     * O electron-updater só funciona de verdade
+     * quando o aplicativo está empacotado.
      *
-     * npm.cmd start
-     *
-     * não fazemos consulta de atualização.
-     *
-     * Auto-update deve ser testado com
-     * a versão instalada pelo NSIS.
+     * Em npm.cmd start deixamos o estado visível
+     * como "development" para a interface.
      */
     if (
         !app.isPackaged
@@ -115,21 +200,33 @@ function configureAutoUpdater() {
         );
 
 
+        setUpdaterState({
+            status:
+                "development",
+
+            error:
+                null
+        });
+
+
         return;
     }
 
 
-    autoUpdater.autoDownload =
-        true;
-
-
     /*
-     * Na versão estável atual do
-     * electron-updater, o comportamento padrão
-     * é instalar a atualização ao sair do app.
+     * A atualização agora é controlada pela UI:
+     *
+     * 1. verifica;
+     * 2. informa que existe nova versão;
+     * 3. usuário manda baixar;
+     * 4. usuário manda reiniciar/instalar.
      */
+    autoUpdater.autoDownload =
+        false;
+
+
     autoUpdater.autoInstallOnAppQuit =
-        true;
+        false;
 
 
     autoUpdater.on(
@@ -139,6 +236,30 @@ function configureAutoUpdater() {
             console.log(
                 "[Updater] procurando atualização..."
             );
+
+
+            setUpdaterState({
+                status:
+                    "checking",
+
+                availableVersion:
+                    null,
+
+                percent:
+                    0,
+
+                transferred:
+                    0,
+
+                total:
+                    0,
+
+                bytesPerSecond:
+                    0,
+
+                error:
+                    null
+            });
         }
     );
 
@@ -157,6 +278,31 @@ function configureAutoUpdater() {
                     info.version
                 }
             );
+
+
+            setUpdaterState({
+                status:
+                    "available",
+
+                availableVersion:
+                    info.version ||
+                    null,
+
+                percent:
+                    0,
+
+                transferred:
+                    0,
+
+                total:
+                    0,
+
+                bytesPerSecond:
+                    0,
+
+                error:
+                    null
+            });
         }
     );
 
@@ -175,6 +321,30 @@ function configureAutoUpdater() {
                     info.version
                 }
             );
+
+
+            setUpdaterState({
+                status:
+                    "up-to-date",
+
+                availableVersion:
+                    null,
+
+                percent:
+                    0,
+
+                transferred:
+                    0,
+
+                total:
+                    0,
+
+                bytesPerSecond:
+                    0,
+
+                error:
+                    null
+            });
         }
     );
 
@@ -183,9 +353,45 @@ function configureAutoUpdater() {
         "download-progress",
         progress => {
 
+            const percent =
+                Number(
+                    progress.percent ||
+                    0
+                );
+
+
             console.log(
-                `[Updater] download: ${progress.percent.toFixed(1)}%`
+                `[Updater] download: ${percent.toFixed(1)}%`
             );
+
+
+            setUpdaterState({
+                status:
+                    "downloading",
+
+                percent,
+
+                transferred:
+                    Number(
+                        progress.transferred ||
+                        0
+                    ),
+
+                total:
+                    Number(
+                        progress.total ||
+                        0
+                    ),
+
+                bytesPerSecond:
+                    Number(
+                        progress.bytesPerSecond ||
+                        0
+                    ),
+
+                error:
+                    null
+            });
         }
     );
 
@@ -195,14 +401,25 @@ function configureAutoUpdater() {
         info => {
 
             console.log(
-                "[Updater] atualização baixada:",
+                "[Updater] atualização pronta para instalar:",
                 info.version
             );
 
 
-            console.log(
-                "[Updater] será instalada quando o Sharkord Desktop for fechado."
-            );
+            setUpdaterState({
+                status:
+                    "downloaded",
+
+                availableVersion:
+                    info.version ||
+                    updaterState.availableVersion,
+
+                percent:
+                    100,
+
+                error:
+                    null
+            });
         }
     );
 
@@ -215,15 +432,25 @@ function configureAutoUpdater() {
                 "[Updater] erro:",
                 error
             );
+
+
+            setUpdaterState({
+                status:
+                    "error",
+
+                error:
+                    error?.message ||
+                    String(
+                        error
+                    )
+            });
         }
     );
 
 
     /*
-     * Espera alguns segundos após abrir.
-     *
-     * Assim a atualização não compete com
-     * carregamento inicial / login / WebRTC.
+     * Continua verificando automaticamente ao abrir,
+     * mas não baixa nada sem autorização do usuário.
      */
     setTimeout(
         () => {
@@ -234,7 +461,7 @@ function configureAutoUpdater() {
 
 
             autoUpdater
-                .checkForUpdatesAndNotify()
+                .checkForUpdates()
                 .catch(
                     error => {
 
@@ -249,6 +476,263 @@ function configureAutoUpdater() {
         5000
     );
 }
+
+
+// ======================================================
+// IPC AUTO UPDATE
+// ======================================================
+
+ipcMain.handle(
+    "updater:get-state",
+    async () => {
+
+        return getUpdaterState();
+    }
+);
+
+
+ipcMain.handle(
+    "updater:check",
+    async () => {
+
+        if (
+            !app.isPackaged
+        ) {
+
+            return {
+                success:
+                    false,
+
+                reason:
+                    "development",
+
+                state:
+                    getUpdaterState()
+            };
+        }
+
+
+        try {
+
+            await autoUpdater
+                .checkForUpdates();
+
+
+            return {
+                success:
+                    true,
+
+                state:
+                    getUpdaterState()
+            };
+
+        } catch (error) {
+
+            console.error(
+                "[Updater] erro na verificação manual:",
+                error
+            );
+
+
+            return {
+                success:
+                    false,
+
+                reason:
+                    "error",
+
+                error:
+                    error?.message ||
+                    String(
+                        error
+                    ),
+
+                state:
+                    getUpdaterState()
+            };
+        }
+    }
+);
+
+
+ipcMain.handle(
+    "updater:download",
+    async () => {
+
+        if (
+            !app.isPackaged
+        ) {
+
+            return {
+                success:
+                    false,
+
+                reason:
+                    "development",
+
+                state:
+                    getUpdaterState()
+            };
+        }
+
+
+        if (
+            updaterState.status !==
+            "available"
+        ) {
+
+            return {
+                success:
+                    false,
+
+                reason:
+                    "not-available",
+
+                state:
+                    getUpdaterState()
+            };
+        }
+
+
+        try {
+
+            setUpdaterState({
+                status:
+                    "downloading",
+
+                percent:
+                    0,
+
+                error:
+                    null
+            });
+
+
+            await autoUpdater
+                .downloadUpdate();
+
+
+            return {
+                success:
+                    true,
+
+                state:
+                    getUpdaterState()
+            };
+
+        } catch (error) {
+
+            console.error(
+                "[Updater] erro iniciando download:",
+                error
+            );
+
+
+            setUpdaterState({
+                status:
+                    "error",
+
+                error:
+                    error?.message ||
+                    String(
+                        error
+                    )
+            });
+
+
+            return {
+                success:
+                    false,
+
+                reason:
+                    "error",
+
+                error:
+                    error?.message ||
+                    String(
+                        error
+                    ),
+
+                state:
+                    getUpdaterState()
+            };
+        }
+    }
+);
+
+
+ipcMain.handle(
+    "updater:install",
+    async () => {
+
+        if (
+            !app.isPackaged
+        ) {
+
+            return {
+                success:
+                    false,
+
+                reason:
+                    "development",
+
+                state:
+                    getUpdaterState()
+            };
+        }
+
+
+        if (
+            updaterState.status !==
+            "downloaded"
+        ) {
+
+            return {
+                success:
+                    false,
+
+                reason:
+                    "not-downloaded",
+
+                state:
+                    getUpdaterState()
+            };
+        }
+
+
+        updaterInstalling =
+            true;
+
+
+        setUpdaterState({
+            status:
+                "installing",
+
+            error:
+                null
+        });
+
+
+        setImmediate(
+            () => {
+
+                autoUpdater.quitAndInstall(
+                    false,
+                    true
+                );
+            }
+        );
+
+
+        return {
+            success:
+                true,
+
+            state:
+                getUpdaterState()
+        };
+    }
+);
 
 
 // ======================================================
@@ -2115,6 +2599,19 @@ function createMainWindow() {
     mainWindow.on(
         "close",
         event => {
+
+            if (
+                updaterInstalling
+            ) {
+
+                console.log(
+                    "[Updater] fechamento autorizado para instalar atualização."
+                );
+
+
+                return;
+            }
+
 
             event.preventDefault();
 
