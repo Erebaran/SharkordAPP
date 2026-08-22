@@ -3381,224 +3381,1256 @@ function isInterestingWebSocketPayload(
         ) ||
         value.includes(
             "permission"
+        ) ||
+        value.includes(
+            "publicsettings"
+        ) ||
+        value.includes(
+            "banner"
+        ) ||
+        value.includes(
+            "logo"
         )
     );
 }
 
 
 function attachSharkordWebSocketLogger(win) {
-    if (!win || win.isDestroyed()) return;
 
-    const debuggerClient = win.webContents.debugger;
-    const subscriptionPathsById = new Map();
-    const liveUsers = new Map();
-    const liveRoles = new Map();
+    if (
+        !win ||
+        win.isDestroyed()
+    ) {
 
-    function compactUser(user) {
-        if (!user || user.id == null) return null;
+        return;
+    }
+
+
+    const debuggerClient =
+        win.webContents.debugger;
+
+
+    const subscriptionPathsById =
+        new Map();
+
+
+    const liveUsers =
+        new Map();
+
+
+    const liveRoles =
+        new Map();
+
+
+    let livePublicSettings =
+        null;
+
+
+    // ==================================================
+    // SERVER BRANDING
+    // ==================================================
+
+    function compactBrandFile(
+        file
+    ) {
+
+        if (
+            !file ||
+            typeof file !==
+            "object"
+        ) {
+
+            return null;
+        }
+
+
         return {
-            id: user.id,
-            name: user.name,
-            roleIds: Array.isArray(user.roleIds) ? user.roleIds : []
+
+            id:
+                file.id ??
+                null,
+
+            name:
+                file.name ??
+                null,
+
+            originalName:
+                file.originalName ??
+                null,
+
+            mimeType:
+                file.mimeType ??
+                null,
+
+            extension:
+                file.extension ??
+                null,
+
+            size:
+                file.size ??
+                null
         };
     }
 
-    function compactRole(role) {
-        if (!role || role.id == null) return null;
+
+    function compactPublicSettings(
+        settings
+    ) {
+
+        if (
+            !settings ||
+            typeof settings !==
+            "object"
+        ) {
+
+            return null;
+        }
+
+
         return {
-            id: role.id,
-            name: role.name,
-            color: role.color || null,
-            isDefault: Boolean(role.isDefault)
+
+            name:
+                settings.name ||
+                null,
+
+            serverId:
+                settings.serverId ||
+                null,
+
+            logo:
+                compactBrandFile(
+                    settings.logo
+                ),
+
+            banner:
+                compactBrandFile(
+                    settings.banner
+                )
         };
     }
 
-    function sendSnapshot(reason) {
-        if (!win || win.isDestroyed()) return;
+
+    function sendBrandingSnapshot(
+        reason
+    ) {
+
+        if (
+            !win ||
+            win.isDestroyed() ||
+            !livePublicSettings
+        ) {
+
+            return;
+        }
+
+
+        win.webContents.send(
+            "server-branding:server-data",
+            livePublicSettings
+        );
+
+
+        console.log(
+            "[Server Branding] dados server-side enviados:",
+            {
+                reason,
+
+                name:
+                livePublicSettings.name,
+
+                logo:
+                    livePublicSettings.logo
+                        ?.name ||
+                    null,
+
+                banner:
+                    livePublicSettings.banner
+                        ?.name ||
+                    null
+            }
+        );
+    }
+
+
+    function findPublicSettings(
+        value,
+        depth = 0
+    ) {
+
+        if (
+            depth >
+            12 ||
+            !value ||
+            typeof value !==
+            "object"
+        ) {
+
+            return null;
+        }
+
+
+        if (
+            value.publicSettings &&
+            typeof value.publicSettings ===
+            "object"
+        ) {
+
+            return value.publicSettings;
+        }
+
+
+        /*
+         * Também aceita publicSettings quando
+         * ele aparece diretamente como objeto,
+         * sem a chave "publicSettings".
+         */
+        if (
+            typeof value.name ===
+            "string" &&
+
+            value.serverId !=
+            null &&
+
+            (
+                Object.prototype
+                    .hasOwnProperty.call(
+                    value,
+                    "logo"
+                ) ||
+
+                Object.prototype
+                    .hasOwnProperty.call(
+                    value,
+                    "banner"
+                )
+            )
+        ) {
+
+            return value;
+        }
+
+
+        const children =
+            Array.isArray(
+                value
+            )
+                ? value
+                : Object.values(
+                    value
+                );
+
+
+        for (
+            const child
+            of children
+            ) {
+
+            const found =
+                findPublicSettings(
+                    child,
+                    depth +
+                    1
+                );
+
+
+            if (
+                found
+            ) {
+
+                return found;
+            }
+        }
+
+
+        return null;
+    }
+
+
+    function updatePublicSettings(
+        value,
+        reason
+    ) {
+
+        const found =
+            findPublicSettings(
+                value
+            );
+
+
+        if (
+            !found
+        ) {
+
+            return false;
+        }
+
+
+        const compact =
+            compactPublicSettings(
+                found
+            );
+
+
+        if (
+            !compact
+        ) {
+
+            return false;
+        }
+
+
+        const nextSignature =
+            JSON.stringify(
+                compact
+            );
+
+
+        const previousSignature =
+            JSON.stringify(
+                livePublicSettings
+            );
+
+
+        /*
+         * Evita mandar a mesma informação
+         * repetidamente para o preload.
+         */
+        if (
+            nextSignature ===
+            previousSignature
+        ) {
+
+            return true;
+        }
+
+
+        livePublicSettings =
+            compact;
+
+
+        sendBrandingSnapshot(
+            reason
+        );
+
+
+        return true;
+    }
+
+
+    // ==================================================
+    // MEMBER ROLES
+    // ==================================================
+
+    function compactUser(
+        user
+    ) {
+
+        if (
+            !user ||
+            user.id ==
+            null
+        ) {
+
+            return null;
+        }
+
+
+        return {
+
+            id:
+            user.id,
+
+            name:
+            user.name,
+
+            roleIds:
+                Array.isArray(
+                    user.roleIds
+                )
+                    ? user.roleIds
+                    : []
+        };
+    }
+
+
+    function compactRole(
+        role
+    ) {
+
+        if (
+            !role ||
+            role.id ==
+            null
+        ) {
+
+            return null;
+        }
+
+
+        return {
+
+            id:
+            role.id,
+
+            name:
+            role.name,
+
+            color:
+                role.color ||
+                null,
+
+            isDefault:
+                Boolean(
+                    role.isDefault
+                )
+        };
+    }
+
+
+    function sendSnapshot(
+        reason
+    ) {
+
+        if (
+            !win ||
+            win.isDestroyed()
+        ) {
+
+            return;
+        }
+
 
         const compactData = {
-            users: Array.from(liveUsers.values())
-                .filter(user => user && user.name !== "__deleted_user__"),
-            roles: Array.from(liveRoles.values())
+
+            users:
+                Array
+                    .from(
+                        liveUsers.values()
+                    )
+                    .filter(
+                        user =>
+                            user &&
+                            user.name !==
+                            "__deleted_user__"
+                    ),
+
+            roles:
+                Array.from(
+                    liveRoles.values()
+                )
         };
 
-        win.webContents.send("member-roles:server-data", compactData);
-        console.log("[Member Roles] dados enviados ao preload:", {
-            reason,
-            users: compactData.users.length,
-            roles: compactData.roles.length
-        });
+
+        win.webContents.send(
+            "member-roles:server-data",
+            compactData
+        );
+
+
+        console.log(
+            "[Member Roles] dados enviados ao preload:",
+            {
+                reason,
+
+                users:
+                compactData.users.length,
+
+                roles:
+                compactData.roles.length
+            }
+        );
     }
 
-    function findServerData(value, depth = 0) {
-        if (depth > 10 || !value || typeof value !== "object") return null;
-        if (Array.isArray(value.users) && Array.isArray(value.roles)) return value;
-        const children = Array.isArray(value) ? value : Object.values(value);
-        for (const child of children) {
-            const found = findServerData(child, depth + 1);
-            if (found) return found;
+
+    function findServerData(
+        value,
+        depth = 0
+    ) {
+
+        if (
+            depth >
+            10 ||
+            !value ||
+            typeof value !==
+            "object"
+        ) {
+
+            return null;
         }
+
+
+        if (
+            Array.isArray(
+                value.users
+            ) &&
+            Array.isArray(
+                value.roles
+            )
+        ) {
+
+            return value;
+        }
+
+
+        const children =
+            Array.isArray(
+                value
+            )
+                ? value
+                : Object.values(
+                    value
+                );
+
+
+        for (
+            const child
+            of children
+            ) {
+
+            const found =
+                findServerData(
+                    child,
+                    depth +
+                    1
+                );
+
+
+            if (
+                found
+            ) {
+
+                return found;
+            }
+        }
+
+
         return null;
     }
 
-    function replaceInitialState(serverData) {
+
+    function replaceInitialState(
+        serverData
+    ) {
+
         liveUsers.clear();
+
+
         liveRoles.clear();
 
-        for (const rawUser of serverData.users || []) {
-            const user = compactUser(rawUser);
-            if (user && user.name !== "__deleted_user__") {
-                liveUsers.set(Number(user.id), user);
+
+        for (
+            const rawUser
+            of serverData.users ||
+        []
+            ) {
+
+            const user =
+                compactUser(
+                    rawUser
+                );
+
+
+            if (
+                user &&
+                user.name !==
+                "__deleted_user__"
+            ) {
+
+                liveUsers.set(
+                    Number(
+                        user.id
+                    ),
+                    user
+                );
             }
         }
 
-        for (const rawRole of serverData.roles || []) {
-            const role = compactRole(rawRole);
-            if (role) liveRoles.set(Number(role.id), role);
+
+        for (
+            const rawRole
+            of serverData.roles ||
+        []
+            ) {
+
+            const role =
+                compactRole(
+                    rawRole
+                );
+
+
+            if (
+                role
+            ) {
+
+                liveRoles.set(
+                    Number(
+                        role.id
+                    ),
+                    role
+                );
+            }
         }
 
-        sendSnapshot("initial-state");
+
+        sendSnapshot(
+            "initial-state"
+        );
     }
 
-    function learnSubscriptions(parsed) {
-        const list = Array.isArray(parsed) ? parsed : [parsed];
-        for (const item of list) {
+
+    // ==================================================
+    // SUBSCRIPTIONS
+    // ==================================================
+
+    function learnSubscriptions(
+        parsed
+    ) {
+
+        const list =
+            Array.isArray(
+                parsed
+            )
+                ? parsed
+                : [
+                    parsed
+                ];
+
+
+        for (
+            const item
+            of list
+            ) {
+
             if (
-                item?.method === "subscription" &&
-                item?.id != null &&
+                item?.method ===
+                "subscription" &&
+
+                item?.id !=
+                null &&
+
                 item?.params?.path
             ) {
-                subscriptionPathsById.set(Number(item.id), String(item.params.path));
+
+                subscriptionPathsById.set(
+                    Number(
+                        item.id
+                    ),
+
+                    String(
+                        item.params.path
+                    )
+                );
             }
         }
     }
 
-    function unwrapData(message) {
-        return message?.result?.data ?? message?.result ?? message?.data ?? null;
+
+    function unwrapData(
+        message
+    ) {
+
+        return (
+            message?.result?.data ??
+            message?.result ??
+            message?.data ??
+            null
+        );
     }
 
-    function findEntity(value, depth = 0) {
-        if (depth > 8 || value == null) return null;
-        if (typeof value === "number" || typeof value === "string") return { id: value };
-        if (typeof value !== "object") return null;
-        if (value.id != null) return value;
 
-        for (const key of ["user", "member", "role", "data"]) {
-            if (value[key] !== undefined) {
-                const found = findEntity(value[key], depth + 1);
-                if (found) return found;
+    function findEntity(
+        value,
+        depth = 0
+    ) {
+
+        if (
+            depth >
+            8 ||
+            value ==
+            null
+        ) {
+
+            return null;
+        }
+
+
+        if (
+            typeof value ===
+            "number" ||
+            typeof value ===
+            "string"
+        ) {
+
+            return {
+                id:
+                value
+            };
+        }
+
+
+        if (
+            typeof value !==
+            "object"
+        ) {
+
+            return null;
+        }
+
+
+        if (
+            value.id !=
+            null
+        ) {
+
+            return value;
+        }
+
+
+        for (
+            const key
+            of [
+            "user",
+            "member",
+            "role",
+            "data"
+        ]
+            ) {
+
+            if (
+                value[
+                    key
+                    ] !==
+                undefined
+            ) {
+
+                const found =
+                    findEntity(
+                        value[
+                            key
+                            ],
+                        depth +
+                        1
+                    );
+
+
+                if (
+                    found
+                ) {
+
+                    return found;
+                }
             }
         }
 
-        const children = Array.isArray(value) ? value : Object.values(value);
-        for (const child of children) {
-            const found = findEntity(child, depth + 1);
-            if (found) return found;
+
+        const children =
+            Array.isArray(
+                value
+            )
+                ? value
+                : Object.values(
+                    value
+                );
+
+
+        for (
+            const child
+            of children
+            ) {
+
+            const found =
+                findEntity(
+                    child,
+                    depth +
+                    1
+                );
+
+
+            if (
+                found
+            ) {
+
+                return found;
+            }
         }
+
+
         return null;
     }
 
-    function applyLiveMessage(message) {
-        if (!message || message.id == null) return false;
-        const path = subscriptionPathsById.get(Number(message.id));
-        if (!path) return false;
 
-        const raw = findEntity(unwrapData(message));
-        if (!raw || raw.id == null) return false;
+    function applyLiveMessage(
+        message
+    ) {
 
-        if (["users.onUpdate", "users.onCreate", "users.onJoin"].includes(path)) {
-            const previous = liveUsers.get(Number(raw.id)) || {};
-            const user = compactUser({ ...previous, ...raw });
-            if (!user) return false;
-            liveUsers.set(Number(user.id), user);
-            sendSnapshot(path);
-            return true;
+        if (
+            !message ||
+            message.id ==
+            null
+        ) {
+
+            return false;
         }
 
-        if (["users.onDelete", "users.onLeave"].includes(path)) {
-            liveUsers.delete(Number(raw.id));
-            sendSnapshot(path);
-            return true;
+
+        const path =
+            subscriptionPathsById.get(
+                Number(
+                    message.id
+                )
+            );
+
+
+        if (
+            !path
+        ) {
+
+            return false;
         }
 
-        if (["roles.onUpdate", "roles.onCreate"].includes(path)) {
-            const previous = liveRoles.get(Number(raw.id)) || {};
-            const role = compactRole({ ...previous, ...raw });
-            if (!role) return false;
-            liveRoles.set(Number(role.id), role);
-            sendSnapshot(path);
-            return true;
+
+        const raw =
+            findEntity(
+                unwrapData(
+                    message
+                )
+            );
+
+
+        if (
+            !raw ||
+            raw.id ==
+            null
+        ) {
+
+            return false;
         }
 
-        if (path === "roles.onDelete") {
-            const deletedId = Number(raw.id);
-            liveRoles.delete(deletedId);
-            for (const [id, user] of liveUsers) {
-                liveUsers.set(id, {
-                    ...user,
-                    roleIds: (user.roleIds || []).filter(roleId => Number(roleId) !== deletedId)
+
+        // ==============================================
+        // USERS
+        // ==============================================
+
+        if (
+            [
+                "users.onUpdate",
+                "users.onCreate",
+                "users.onJoin"
+            ].includes(
+                path
+            )
+        ) {
+
+            const previous =
+                liveUsers.get(
+                    Number(
+                        raw.id
+                    )
+                ) ||
+                {};
+
+
+            const user =
+                compactUser({
+                    ...previous,
+                    ...raw
                 });
+
+
+            if (
+                !user
+            ) {
+
+                return false;
             }
-            sendSnapshot(path);
+
+
+            liveUsers.set(
+                Number(
+                    user.id
+                ),
+                user
+            );
+
+
+            sendSnapshot(
+                path
+            );
+
+
             return true;
         }
+
+
+        if (
+            [
+                "users.onDelete",
+                "users.onLeave"
+            ].includes(
+                path
+            )
+        ) {
+
+            liveUsers.delete(
+                Number(
+                    raw.id
+                )
+            );
+
+
+            sendSnapshot(
+                path
+            );
+
+
+            return true;
+        }
+
+
+        // ==============================================
+        // ROLES
+        // ==============================================
+
+        if (
+            [
+                "roles.onUpdate",
+                "roles.onCreate"
+            ].includes(
+                path
+            )
+        ) {
+
+            const previous =
+                liveRoles.get(
+                    Number(
+                        raw.id
+                    )
+                ) ||
+                {};
+
+
+            const role =
+                compactRole({
+                    ...previous,
+                    ...raw
+                });
+
+
+            if (
+                !role
+            ) {
+
+                return false;
+            }
+
+
+            liveRoles.set(
+                Number(
+                    role.id
+                ),
+                role
+            );
+
+
+            sendSnapshot(
+                path
+            );
+
+
+            return true;
+        }
+
+
+        if (
+            path ===
+            "roles.onDelete"
+        ) {
+
+            const deletedId =
+                Number(
+                    raw.id
+                );
+
+
+            liveRoles.delete(
+                deletedId
+            );
+
+
+            for (
+                const [
+                    id,
+                    user
+                ]
+                of liveUsers
+                ) {
+
+                liveUsers.set(
+                    id,
+                    {
+                        ...user,
+
+                        roleIds:
+                            (
+                                user.roleIds ||
+                                []
+                            ).filter(
+                                roleId =>
+                                    Number(
+                                        roleId
+                                    ) !==
+                                    deletedId
+                            )
+                    }
+                );
+            }
+
+
+            sendSnapshot(
+                path
+            );
+
+
+            return true;
+        }
+
 
         return false;
     }
 
+
+    // ==================================================
+    // DEBUGGER / WEBSOCKET
+    // ==================================================
+
     try {
-        if (!debuggerClient.isAttached()) debuggerClient.attach("1.3");
 
-        debuggerClient.sendCommand("Network.enable").catch(error => {
-            console.error("[Sharkord WS] erro habilitando Network:", error);
-        });
+        if (
+            !debuggerClient
+                .isAttached()
+        ) {
 
-        debuggerClient.on("message", (_event, method, params) => {
-            const received = method === "Network.webSocketFrameReceived";
-            const sent = method === "Network.webSocketFrameSent";
-            if (!received && !sent) return;
-
-            const frame = params?.response;
-            if (!frame || Number(frame.opcode) !== 1) return;
-
-            const payload = String(frame.payloadData || "");
-
-            try {
-                const parsed = JSON.parse(payload);
-
-                if (sent) learnSubscriptions(parsed);
-
-                if (received) {
-                    const list = Array.isArray(parsed) ? parsed : [parsed];
-                    for (const message of list) {
-                        const serverData = findServerData(message);
-                        if (serverData) replaceInitialState(serverData);
-                        else applyLiveMessage(message);
-                    }
-                }
-            } catch {}
-
-            if (!isInterestingWebSocketPayload(payload)) return;
-
-            const safePayload = redactSensitiveWebSocketData(payload);
-            const MAX_LOG_LENGTH = 20000;
-            const output = safePayload.length > MAX_LOG_LENGTH
-                ? safePayload.slice(0, MAX_LOG_LENGTH) + " ... <TRUNCATED>"
-                : safePayload;
-
-            console.log(
-                received ? "[Sharkord WS RECEIVED]" : "[Sharkord WS SENT]",
-                output
+            debuggerClient.attach(
+                "1.3"
             );
-        });
+        }
 
-        debuggerClient.on("detach", (_event, reason) => {
-            console.log("[Sharkord WS] debugger desconectado:", reason);
-        });
 
-        console.log("[Sharkord WS] logger de frames ativado.");
+        debuggerClient
+            .sendCommand(
+                "Network.enable"
+            )
+            .catch(
+                error => {
+
+                    console.error(
+                        "[Sharkord WS] erro habilitando Network:",
+                        error
+                    );
+                }
+            );
+
+
+        debuggerClient.on(
+            "message",
+            (
+                _event,
+                method,
+                params
+            ) => {
+
+                const received =
+                    method ===
+                    "Network.webSocketFrameReceived";
+
+
+                const sent =
+                    method ===
+                    "Network.webSocketFrameSent";
+
+
+                if (
+                    !received &&
+                    !sent
+                ) {
+
+                    return;
+                }
+
+
+                const frame =
+                    params
+                        ?.response;
+
+
+                if (
+                    !frame ||
+                    Number(
+                        frame.opcode
+                    ) !==
+                    1
+                ) {
+
+                    return;
+                }
+
+
+                const payload =
+                    String(
+                        frame.payloadData ||
+                        ""
+                    );
+
+
+                try {
+
+                    const parsed =
+                        JSON.parse(
+                            payload
+                        );
+
+
+                    if (
+                        sent
+                    ) {
+
+                        learnSubscriptions(
+                            parsed
+                        );
+                    }
+
+
+                    if (
+                        received
+                    ) {
+
+                        const list =
+                            Array.isArray(
+                                parsed
+                            )
+                                ? parsed
+                                : [
+                                    parsed
+                                ];
+
+
+                        for (
+                            const message
+                            of list
+                            ) {
+
+                            /*
+                             * Primeiro tenta encontrar
+                             * publicSettings.
+                             *
+                             * Isso alimenta:
+                             *
+                             * branding-preload.js
+                             */
+                            updatePublicSettings(
+                                message,
+                                "websocket"
+                            );
+
+
+                            /*
+                             * Depois mantém a lógica
+                             * existente de usuários/roles.
+                             */
+                            const serverData =
+                                findServerData(
+                                    message
+                                );
+
+
+                            if (
+                                serverData
+                            ) {
+
+                                replaceInitialState(
+                                    serverData
+                                );
+
+                            } else {
+
+                                applyLiveMessage(
+                                    message
+                                );
+                            }
+                        }
+                    }
+
+                } catch {}
+
+
+                if (
+                    !isInterestingWebSocketPayload(
+                        payload
+                    )
+                ) {
+
+                    return;
+                }
+
+
+                const safePayload =
+                    redactSensitiveWebSocketData(
+                        payload
+                    );
+
+
+                const MAX_LOG_LENGTH =
+                    20000;
+
+
+                const output =
+                    safePayload.length >
+                    MAX_LOG_LENGTH
+                        ? (
+                            safePayload.slice(
+                                0,
+                                MAX_LOG_LENGTH
+                            ) +
+                            " ... <TRUNCATED>"
+                        )
+                        : safePayload;
+
+
+                console.log(
+                    received
+                        ? "[Sharkord WS RECEIVED]"
+                        : "[Sharkord WS SENT]",
+                    output
+                );
+            }
+        );
+
+
+        debuggerClient.on(
+            "detach",
+            (
+                _event,
+                reason
+            ) => {
+
+                console.log(
+                    "[Sharkord WS] debugger desconectado:",
+                    reason
+                );
+            }
+        );
+
+
+        console.log(
+            "[Sharkord WS] logger de frames ativado."
+        );
+
     } catch (error) {
-        console.error("[Sharkord WS] erro ativando logger:", error);
+
+        console.error(
+            "[Sharkord WS] erro ativando logger:",
+            error
+        );
     }
 }
 

@@ -49,6 +49,119 @@ if (
 
 
     // ==================================================
+    // SERVER-SIDE BRANDING
+    // ==================================================
+
+    function buildPublicFileUrl(
+        file
+    ) {
+
+        if (
+            !file ||
+            !file.name
+        ) {
+
+            return null;
+        }
+
+
+        try {
+
+            return new URL(
+                `/public/${encodeURIComponent(
+                    file.name
+                )}`,
+                SERVER_URL
+            ).toString();
+
+        } catch {
+
+            return null;
+        }
+    }
+
+
+    function applyServerBranding(
+        data
+    ) {
+
+        if (
+            !data ||
+            typeof data !==
+            "object"
+        ) {
+
+            return;
+        }
+
+
+        const nextProfile = {
+
+            url:
+            SERVER_URL,
+
+            name:
+                data.name ||
+                currentProfile?.name ||
+                guessServerName(),
+
+            avatarDataUrl:
+                buildPublicFileUrl(
+                    data.logo
+                ),
+
+            bannerDataUrl:
+                buildPublicFileUrl(
+                    data.banner
+                )
+        };
+
+
+        currentProfile =
+            nextProfile;
+
+
+        console.log(
+            "[Server Branding] branding server-side recebido:",
+            {
+                name:
+                nextProfile.name,
+
+                logo:
+                    data.logo?.name ||
+                    null,
+
+                banner:
+                    data.banner?.name ||
+                    null
+            }
+        );
+
+
+        applyProfile(
+            nextProfile
+        );
+
+
+        scheduleInstall();
+    }
+
+
+    ipcRenderer.on(
+        "server-branding:server-data",
+        (
+            _event,
+            data
+        ) => {
+
+            applyServerBranding(
+                data
+            );
+        }
+    );
+
+
+    // ==================================================
     // HELPERS
     // ==================================================
 
@@ -81,27 +194,33 @@ if (
 
         const parts =
             String(
-                name || "Servidor"
+                name ||
+                "Servidor"
             )
                 .trim()
                 .split(
                     /\s+/
                 )
-                .filter(Boolean);
+                .filter(
+                    Boolean
+                );
 
 
-        return parts
+        return (
+            parts
                 .slice(
                     0,
                     2
                 )
                 .map(
                     part =>
-                        part[0]?.toUpperCase() ||
+                        part[0]
+                            ?.toUpperCase() ||
                         ""
                 )
                 .join("") ||
-            "S";
+            "S"
+        );
     }
 
 
@@ -110,7 +229,9 @@ if (
         const labels =
             location.hostname
                 .split(".")
-                .filter(Boolean);
+                .filter(
+                    Boolean
+                );
 
 
         const ignored =
@@ -150,13 +271,17 @@ if (
         element
     ) {
 
-        if (!element) {
+        if (
+            !element
+        ) {
+
             return false;
         }
 
 
         const rect =
-            element.getBoundingClientRect();
+            element
+                .getBoundingClientRect();
 
 
         if (
@@ -187,7 +312,10 @@ if (
         element
     ) {
 
-        if (!element) {
+        if (
+            !element
+        ) {
+
             return "";
         }
 
@@ -208,8 +336,12 @@ if (
                     "data-tooltip-content"
                 )
             ]
-                .filter(Boolean)
-                .join(" ")
+                .filter(
+                    Boolean
+                )
+                .join(
+                    " "
+                )
         );
     }
 
@@ -282,22 +414,31 @@ if (
 
             for (
                 let depth = 0;
+
                 node &&
                 depth < 8;
+
                 depth++
             ) {
 
                 const rect =
-                    node.getBoundingClientRect();
+                    node
+                        .getBoundingClientRect();
 
 
                 if (
-                    rect.width >= 180 &&
-                    rect.width <= 360 &&
+                    rect.width >=
+                    180 &&
+
+                    rect.width <=
+                    360 &&
+
                     rect.height >=
                     window.innerHeight *
                     0.55 &&
-                    rect.left <= 420
+
+                    rect.left <=
+                    420
                 ) {
 
                     let score =
@@ -372,7 +513,10 @@ if (
         serverName
     ) {
 
-        if (!sidebar) {
+        if (
+            !sidebar
+        ) {
+
             return null;
         }
 
@@ -384,7 +528,8 @@ if (
 
 
         const sidebarRect =
-            sidebar.getBoundingClientRect();
+            sidebar
+                .getBoundingClientRect();
 
 
         const textCandidates =
@@ -397,7 +542,9 @@ if (
                         "h1",
                         "h2",
                         "h3"
-                    ].join(",")
+                    ].join(
+                        ","
+                    )
                 )
             );
 
@@ -456,14 +603,17 @@ if (
 
             for (
                 let depth = 0;
+
                 node &&
                 node !== sidebar &&
                 depth < 6;
+
                 depth++
             ) {
 
                 const rect =
-                    node.getBoundingClientRect();
+                    node
+                        .getBoundingClientRect();
 
 
                 const buttons =
@@ -494,8 +644,11 @@ if (
 
 
                 if (
-                    rect.height >= 35 &&
-                    rect.height <= 80
+                    rect.height >=
+                    35 &&
+
+                    rect.height <=
+                    80
                 ) {
 
                     score +=
@@ -519,8 +672,11 @@ if (
 
 
                 if (
-                    relativeTop >= -5 &&
-                    relativeTop <= 220
+                    relativeTop >=
+                    -5 &&
+
+                    relativeTop <=
+                    220
                 ) {
 
                     score +=
@@ -565,7 +721,10 @@ if (
         header
     ) {
 
-        if (!header) {
+        if (
+            !header
+        ) {
+
             return null;
         }
 
@@ -620,7 +779,8 @@ if (
 
 
             const rect =
-                element.getBoundingClientRect();
+                element
+                    .getBoundingClientRect();
 
 
             const area =
@@ -628,13 +788,6 @@ if (
                 rect.height;
 
 
-            /*
-             * Preferimos o menor elemento
-             * que contém exatamente o texto.
-             *
-             * Assim evitamos pegar um container
-             * enorme do header.
-             */
             if (
                 area <
                 bestArea
@@ -662,13 +815,17 @@ if (
         sidebar
     ) {
 
-        if (!sidebar) {
+        if (
+            !sidebar
+        ) {
+
             return null;
         }
 
 
         const sidebarRect =
-            sidebar.getBoundingClientRect();
+            sidebar
+                .getBoundingClientRect();
 
 
         const candidates =
@@ -702,10 +859,6 @@ if (
             }
 
 
-            /*
-             * Ignora qualquer botão dentro
-             * do próprio header.
-             */
             if (
                 currentOriginalHeader &&
                 currentOriginalHeader.contains(
@@ -718,22 +871,22 @@ if (
 
 
             const rect =
-                button.getBoundingClientRect();
+                button
+                    .getBoundingClientRect();
 
 
             if (
-                rect.width > 55 ||
-                rect.height > 55
+                rect.width >
+                55 ||
+
+                rect.height >
+                55
             ) {
 
                 continue;
             }
 
 
-            /*
-             * Ignora área de usuário,
-             * headset, configurações etc.
-             */
             if (
                 rect.top >
                 sidebarRect.top +
@@ -756,7 +909,8 @@ if (
 
 
             if (
-                description === "+"
+                description ===
+                "+"
             ) {
 
                 score +=
@@ -804,10 +958,6 @@ if (
                 sidebarRect.left;
 
 
-            /*
-             * O botão + esperado fica
-             * no lado direito.
-             */
             if (
                 relativeCenterX >
                 sidebarRect.width *
@@ -819,18 +969,10 @@ if (
             }
 
 
-            /*
-             * Quanto mais à direita,
-             * melhor candidato.
-             */
             score +=
                 relativeCenterX;
 
 
-            /*
-             * Evita pegar itens muito próximos
-             * do topo absoluto, como o menu ☰.
-             */
             if (
                 rect.top <
                 sidebarRect.top +
@@ -857,10 +999,12 @@ if (
         }
 
 
-        return bestScore >=
-        100
-            ? best
-            : null;
+        return (
+            bestScore >=
+            100
+                ? best
+                : null
+        );
     }
 
 
@@ -872,7 +1016,10 @@ if (
         header
     ) {
 
-        if (!header) {
+        if (
+            !header
+        ) {
+
             return null;
         }
 
@@ -900,18 +1047,16 @@ if (
         }
 
 
-        /*
-         * Menu do servidor é o botão
-         * mais à direita do header.
-         */
         buttons.sort(
             (
                 a,
                 b
             ) =>
-                b.getBoundingClientRect()
+                b
+                    .getBoundingClientRect()
                     .left -
-                a.getBoundingClientRect()
+                a
+                    .getBoundingClientRect()
                     .left
         );
 
@@ -948,11 +1093,6 @@ if (
             !plusButton
         ) {
 
-            console.warn(
-                "[Server Branding] botão + ainda não encontrado para alinhamento."
-            );
-
-
             return false;
         }
 
@@ -966,11 +1106,6 @@ if (
         if (
             !menuButton
         ) {
-
-            console.warn(
-                "[Server Branding] botão ☰ não encontrado."
-            );
-
 
             return false;
         }
@@ -992,10 +1127,6 @@ if (
                 .getBoundingClientRect();
 
 
-        // ==============================================
-        // HORIZONTAL
-        // ==============================================
-
         const plusCenterX =
             plusRect.left +
             plusRect.width /
@@ -1007,21 +1138,11 @@ if (
             headerRect.left;
 
 
-        // ==============================================
-        // VERTICAL
-        // ==============================================
-
         let desiredCenterY =
             headerRect.height /
             2;
 
 
-        /*
-         * O Y não vem do header.
-         *
-         * Ele vem do centro exato do texto
-         * "Erebaran".
-         */
         if (
             titleElement
         ) {
@@ -1042,10 +1163,6 @@ if (
                 headerRect.top;
         }
 
-
-        // ==============================================
-        // POSICIONAR
-        // ==============================================
 
         menuButton.style.setProperty(
             "position",
@@ -1089,36 +1206,10 @@ if (
         );
 
 
-        /*
-         * Mantém exatamente o tamanho
-         * original do botão.
-         */
         menuButton.style.setProperty(
             "transform",
             "translate(-50%, -50%)",
             "important"
-        );
-
-
-        console.log(
-            "[Server Branding] ☰ alinhado.",
-            {
-                x:
-                desiredCenterX,
-
-                y:
-                desiredCenterY,
-
-                titleFound:
-                    Boolean(
-                        titleElement
-                    ),
-
-                plusFound:
-                    Boolean(
-                        plusButton
-                    )
-            }
         );
 
 
@@ -1154,78 +1245,30 @@ if (
 
         style.textContent = `
 
-            /* ==========================================
-               CONTAINER DO BRANDING
-               ========================================== */
-
             #${BRAND_ROOT_ID} {
-
-                position:
-                    relative;
-
-                flex:
-                    0 0 auto;
-
-                width:
-                    100%;
-
-                height:
-                    166px;
-
-                margin:
-                    0;
-
-                overflow:
-                    visible;
-
-                user-select:
-                    none;
-
-                z-index:
-                    4;
+                position: relative;
+                flex: 0 0 auto;
+                width: 100%;
+                height: 166px;
+                margin: 0;
+                overflow: visible;
+                user-select: none;
+                z-index: 4;
             }
-
-
-            /* ==========================================
-               BANNER
-               ========================================== */
 
             #${BRAND_ROOT_ID}
             .skr-brand-banner {
-
-                position:
-                    absolute;
-
-                left:
-                    0;
-
-                top:
-                    0;
-
-                right:
-                    0;
-
-                width:
-                    100%;
-
-                height:
-                    126px;
-
-                overflow:
-                    hidden;
-
-                cursor:
-                    pointer;
-
+                position: absolute;
+                left: 0;
+                top: 0;
+                right: 0;
+                width: 100%;
+                height: 126px;
+                overflow: hidden;
                 background:
                     radial-gradient(
                         circle at 18% 0%,
-                        rgba(
-                            88,
-                            101,
-                            242,
-                            0.34
-                        ),
+                        rgba(88, 101, 242, 0.34),
                         transparent 56%
                     ),
                     linear-gradient(
@@ -1235,371 +1278,99 @@ if (
                     );
             }
 
-
             #${BRAND_ROOT_ID}
             .skr-brand-banner-image {
-
-                position:
-                    absolute;
-
-                inset:
-                    0;
-
-                width:
-                    100%;
-
-                height:
-                    100%;
-
-                object-fit:
-                    cover;
-
-                object-position:
-                    center;
-
-                display:
-                    none;
+                position: absolute;
+                inset: 0;
+                width: 100%;
+                height: 100%;
+                object-fit: cover;
+                object-position: center;
+                display: none;
             }
-
 
             #${BRAND_ROOT_ID}.has-banner
             .skr-brand-banner-image {
-
-                display:
-                    block;
+                display: block;
             }
-
-
-            /* ==========================================
-               SOMBRA DO BANNER
-               ========================================== */
 
             #${BRAND_ROOT_ID}
             .skr-brand-shade {
-
-                position:
-                    absolute;
-
-                inset:
-                    0;
-
+                position: absolute;
+                inset: 0;
                 background:
                     linear-gradient(
                         to bottom,
-
-                        rgba(
-                            0,
-                            0,
-                            0,
-                            0.48
-                        ) 0%,
-
-                        rgba(
-                            0,
-                            0,
-                            0,
-                            0.10
-                        ) 45%,
-
-                        rgba(
-                            0,
-                            0,
-                            0,
-                            0.55
-                        ) 100%
+                        rgba(0,0,0,0.48) 0%,
+                        rgba(0,0,0,0.10) 45%,
+                        rgba(0,0,0,0.55) 100%
                     );
-
-                pointer-events:
-                    none;
+                pointer-events: none;
             }
-
-
-            /* ==========================================
-               HOVER DO BANNER
-               ========================================== */
-
-            #${BRAND_ROOT_ID}
-            .skr-brand-banner-edit {
-
-                position:
-                    absolute;
-
-                left:
-                    50%;
-
-                top:
-                    62%;
-
-                z-index:
-                    4;
-
-                transform:
-                    translate(
-                        -50%,
-                        -50%
-                    );
-
-                padding:
-                    7px 10px;
-
-                border-radius:
-                    7px;
-
-                background:
-                    rgba(
-                        0,
-                        0,
-                        0,
-                        0.70
-                    );
-
-                color:
-                    #fff;
-
-                font-size:
-                    11px;
-
-                font-weight:
-                    650;
-
-                opacity:
-                    0;
-
-                transition:
-                    opacity
-                    120ms ease;
-
-                pointer-events:
-                    none;
-
-                backdrop-filter:
-                    blur(4px);
-            }
-
-
-            #${BRAND_ROOT_ID}
-            .skr-brand-banner:hover
-            .skr-brand-banner-edit {
-
-                opacity:
-                    1;
-            }
-
-
-            /* ==========================================
-               AVATAR
-               ========================================== */
 
             #${BRAND_ROOT_ID}
             .skr-brand-avatar-wrap {
-
-                position:
-                    absolute;
-
-                left:
-                    16px;
-
-                top:
-                    94px;
-
-                z-index:
-                    20;
-
-                width:
-                    64px;
-
-                height:
-                    64px;
-
-                border-radius:
-                    17px;
-
-                padding:
-                    3px;
-
-                background:
-                    #1e1f22;
-
+                position: absolute;
+                left: 16px;
+                top: 94px;
+                z-index: 20;
+                width: 64px;
+                height: 64px;
+                border-radius: 17px;
+                padding: 3px;
+                background: #1e1f22;
                 box-shadow:
                     0 4px 14px
-                    rgba(
-                        0,
-                        0,
-                        0,
-                        0.38
-                    );
+                    rgba(0,0,0,0.38);
             }
-
 
             #${BRAND_ROOT_ID}
             .skr-brand-avatar {
-
-                position:
-                    relative;
-
-                width:
-                    100%;
-
-                height:
-                    100%;
-
-                overflow:
-                    hidden;
-
-                display:
-                    flex;
-
-                align-items:
-                    center;
-
-                justify-content:
-                    center;
-
-                border-radius:
-                    14px;
-
-                cursor:
-                    pointer;
-
+                position: relative;
+                width: 100%;
+                height: 100%;
+                overflow: hidden;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                border-radius: 14px;
                 background:
                     linear-gradient(
                         135deg,
                         #5865f2,
                         #7b5cff
                     );
-
-                color:
-                    #fff;
-
-                font-size:
-                    20px;
-
-                font-weight:
-                    750;
-
-                letter-spacing:
-                    0.5px;
+                color: #fff;
+                font-size: 20px;
+                font-weight: 750;
+                letter-spacing: 0.5px;
             }
-
 
             #${BRAND_ROOT_ID}
             .skr-brand-avatar-image {
-
-                position:
-                    absolute;
-
-                inset:
-                    0;
-
-                width:
-                    100%;
-
-                height:
-                    100%;
-
-                object-fit:
-                    cover;
-
-                object-position:
-                    center;
-
-                display:
-                    none;
+                position: absolute;
+                inset: 0;
+                width: 100%;
+                height: 100%;
+                object-fit: cover;
+                object-position: center;
+                display: none;
             }
-
 
             #${BRAND_ROOT_ID}.has-avatar
             .skr-brand-avatar-image {
-
-                display:
-                    block;
+                display: block;
             }
-
-
-            #${BRAND_ROOT_ID}
-            .skr-brand-avatar-edit {
-
-                position:
-                    absolute;
-
-                inset:
-                    0;
-
-                display:
-                    flex;
-
-                align-items:
-                    center;
-
-                justify-content:
-                    center;
-
-                background:
-                    rgba(
-                        0,
-                        0,
-                        0,
-                        0.62
-                    );
-
-                color:
-                    white;
-
-                font-size:
-                    11px;
-
-                font-weight:
-                    650;
-
-                opacity:
-                    0;
-
-                transition:
-                    opacity
-                    120ms ease;
-
-                pointer-events:
-                    none;
-            }
-
-
-            #${BRAND_ROOT_ID}
-            .skr-brand-avatar:hover
-            .skr-brand-avatar-edit {
-
-                opacity:
-                    1;
-            }
-
-
-            /* ==========================================
-               TEXTO DE AJUDA
-               ========================================== */
 
             #${BRAND_ROOT_ID}
             .skr-brand-hint {
-
-                position:
-                    absolute;
-
-                left:
-                    92px;
-
-                right:
-                    12px;
-
-                top:
-                    136px;
-
-                overflow:
-                    hidden;
-
-                text-overflow:
-                    ellipsis;
-
-                white-space:
-                    nowrap;
-
+                position: absolute;
+                left: 92px;
+                right: 12px;
+                top: 136px;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
                 color:
                     rgba(
                         255,
@@ -1607,94 +1378,40 @@ if (
                         255,
                         0.47
                     );
-
-                font-size:
-                    10px;
-
-                pointer-events:
-                    none;
+                font-size: 10px;
+                pointer-events: none;
             }
-
-
-            /* ==========================================
-               HEADER ORIGINAL DO SHARKORD
-               ========================================== */
 
             .${ORIGINAL_HEADER_CLASS} {
-
-                position:
-                    absolute !important;
-
-                left:
-                    0 !important;
-
-                right:
-                    0 !important;
-
-                top:
-                    0 !important;
-
-                width:
-                    100% !important;
-
-                z-index:
-                    100 !important;
-
-                margin:
-                    0 !important;
-
-                padding-left:
-                    16px !important;
-
-                padding-right:
-                    0 !important;
-
-                background:
-                    transparent !important;
-
-                border:
-                    none !important;
-
-                box-shadow:
-                    none !important;
+                position: absolute !important;
+                left: 0 !important;
+                right: 0 !important;
+                top: 0 !important;
+                width: 100% !important;
+                z-index: 100 !important;
+                margin: 0 !important;
+                padding-left: 16px !important;
+                padding-right: 0 !important;
+                background: transparent !important;
+                border: none !important;
+                box-shadow: none !important;
             }
-
 
             .${ORIGINAL_HEADER_CLASS},
             .${ORIGINAL_HEADER_CLASS} * {
-
-                color:
-                    white !important;
-
+                color: white !important;
                 text-shadow:
                     0 1px 2px
-                    rgba(
-                        0,
-                        0,
-                        0,
-                        0.95
-                    );
+                    rgba(0,0,0,0.95);
             }
 
-
-            /*
-             * Não aumentamos e nem diminuímos
-             * o botão do menu.
-             *
-             * Só permitimos que o JS controle
-             * a posição dele.
-             */
             .${ORIGINAL_HEADER_CLASS}
             button,
 
             .${ORIGINAL_HEADER_CLASS}
             [role="button"] {
-
-                right:
-                    auto !important;
-
-                z-index:
-                    101;
+                right: auto !important;
+                z-index: 101;
             }
         `;
 
@@ -1714,7 +1431,10 @@ if (
         sidebar
     ) {
 
-        if (!sidebar) {
+        if (
+            !sidebar
+        ) {
+
             return;
         }
 
@@ -1760,11 +1480,6 @@ if (
             !header
         ) {
 
-            console.warn(
-                "[Server Branding] header original do servidor ainda não encontrado."
-            );
-
-
             return false;
         }
 
@@ -1792,10 +1507,6 @@ if (
         );
 
 
-        /*
-         * Depois da classe mudar o layout,
-         * esperamos um frame antes de medir.
-         */
         requestAnimationFrame(
             () => {
 
@@ -1813,10 +1524,6 @@ if (
         );
 
 
-        /*
-         * React pode recalcular o layout
-         * logo depois.
-         */
         setTimeout(
             () => {
 
@@ -1852,11 +1559,6 @@ if (
 
             },
             500
-        );
-
-
-        console.log(
-            "[Server Branding] header original posicionado sobre o banner."
         );
 
 
@@ -1937,10 +1639,6 @@ if (
         }
 
 
-        // ==============================================
-        // AVATAR
-        // ==============================================
-
         if (
             currentProfile.avatarDataUrl
         ) {
@@ -1972,10 +1670,6 @@ if (
             );
         }
 
-
-        // ==============================================
-        // BANNER
-        // ==============================================
 
         if (
             currentProfile.bannerDataUrl
@@ -2009,10 +1703,6 @@ if (
         }
 
 
-        // ==============================================
-        // HEADER
-        // ==============================================
-
         if (
             currentSidebar
         ) {
@@ -2020,55 +1710,6 @@ if (
             positionOriginalHeader(
                 currentSidebar,
                 currentProfile.name
-            );
-        }
-    }
-
-
-    // ==================================================
-    // ESCOLHER IMAGEM
-    // ==================================================
-
-    async function chooseImage(
-        type
-    ) {
-
-        try {
-
-            const result =
-                await ipcRenderer.invoke(
-                    "server:branding:choose-image",
-                    {
-                        serverUrl:
-                        SERVER_URL,
-
-                        type
-                    }
-                );
-
-
-            if (
-                result?.cancelled
-            ) {
-
-                return;
-            }
-
-
-            if (
-                result?.profile
-            ) {
-
-                applyProfile(
-                    result.profile
-                );
-            }
-
-        } catch (error) {
-
-            console.error(
-                "[Server Branding] Falha escolhendo imagem:",
-                error
             );
         }
     }
@@ -2090,17 +1731,10 @@ if (
             BRAND_ROOT_ID;
 
 
-        /*
-         * Não adicionamos outro título.
-         *
-         * O nome visível continua sendo
-         * o original do Sharkord.
-         */
         root.innerHTML = `
 
             <div
                 class="skr-brand-banner"
-                title="Clique para alterar o banner"
             >
 
                 <img
@@ -2112,12 +1746,6 @@ if (
                     class="skr-brand-shade"
                 ></div>
 
-                <div
-                    class="skr-brand-banner-edit"
-                >
-                    Alterar banner
-                </div>
-
             </div>
 
 
@@ -2127,7 +1755,6 @@ if (
 
                 <div
                     class="skr-brand-avatar"
-                    title="Clique para alterar o avatar"
                 >
 
                     <span
@@ -2145,13 +1772,6 @@ if (
                         alt=""
                     >
 
-
-                    <div
-                        class="skr-brand-avatar-edit"
-                    >
-                        Alterar
-                    </div>
-
                 </div>
 
             </div>
@@ -2160,57 +1780,9 @@ if (
             <div
                 class="skr-brand-hint"
             >
-                Clique no avatar ou banner para personalizar
+                Branding definido pelo servidor
             </div>
         `;
-
-
-        // ==============================================
-        // BANNER
-        // ==============================================
-
-        root.querySelector(
-            ".skr-brand-banner"
-        )?.addEventListener(
-            "click",
-            event => {
-
-                event.preventDefault();
-
-
-                event.stopPropagation();
-
-
-                void chooseImage(
-                    "banner"
-                );
-            },
-            true
-        );
-
-
-        // ==============================================
-        // AVATAR
-        // ==============================================
-
-        root.querySelector(
-            ".skr-brand-avatar"
-        )?.addEventListener(
-            "click",
-            event => {
-
-                event.preventDefault();
-
-
-                event.stopPropagation();
-
-
-                void chooseImage(
-                    "avatar"
-                );
-            },
-            true
-        );
 
 
         return root;
@@ -2318,6 +1890,7 @@ if (
 
 
                     void ensureBranding();
+
                 },
                 100
             );
@@ -2348,10 +1921,6 @@ if (
     }
 
 
-    // ==================================================
-    // RESIZE
-    // ==================================================
-
     window.addEventListener(
         "resize",
         () => {
@@ -2372,41 +1941,24 @@ if (
         ensureStyles();
 
 
-        try {
+        currentProfile = {
 
-            currentProfile =
-                await ipcRenderer.invoke(
-                    "server:branding:get",
-                    SERVER_URL
-                );
+            url:
+            SERVER_URL,
 
-        } catch (error) {
+            name:
+                guessServerName(),
 
-            console.error(
-                "[Server Branding] Não foi possível carregar o perfil:",
-                error
-            );
+            avatarDataUrl:
+                null,
 
-
-            currentProfile = {
-
-                url:
-                SERVER_URL,
-
-                name:
-                    guessServerName()
-            };
-        }
+            bannerDataUrl:
+                null
+        };
 
 
         await ensureBranding();
 
-
-        /*
-         * O Sharkord é renderizado com React.
-         * Fazemos algumas passadas para pegar
-         * elementos que aparecem depois.
-         */
 
         setTimeout(
             () => {
@@ -2448,10 +2000,6 @@ if (
         );
 
 
-        // ==============================================
-        // MUTATION OBSERVER
-        // ==============================================
-
         if (
             !observer &&
             document.documentElement
@@ -2467,10 +2015,6 @@ if (
                             );
 
 
-                        /*
-                         * Se o React recriou elementos
-                         * importantes, instala novamente.
-                         */
                         if (
                             !root ||
                             !root.isConnected ||
@@ -2486,10 +2030,6 @@ if (
                         }
 
 
-                        /*
-                         * Se só mudou algum canal/categoria,
-                         * recalculamos a posição do menu.
-                         */
                         if (
                             !installTimer
                         ) {
@@ -2503,6 +2043,7 @@ if (
 
 
                                         realignHeaderMenu();
+
                                     },
                                     80
                                 );
@@ -2525,14 +2066,10 @@ if (
 
 
         console.log(
-            "[Server Branding] v2.3 - alinhamento X pelo + e Y pelo título."
+            "[Server Branding] v3 - server-side."
         );
     }
 
-
-    // ==================================================
-    // DOM READY
-    // ==================================================
 
     if (
         document.readyState ===
