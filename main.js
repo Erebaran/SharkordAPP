@@ -5249,6 +5249,64 @@ function registerMemberRolesPreload() {
 
 
 // ======================================================
+// UPDATER UI PRELOAD
+// ======================================================
+
+function registerUpdaterPreload() {
+
+    const updaterPreloadPath =
+        path.join(
+            __dirname,
+            "updater-preload.js"
+        );
+
+
+    if (
+        !fs.existsSync(
+            updaterPreloadPath
+        )
+    ) {
+
+        console.warn(
+            "[Updater UI] updater-preload.js não encontrado:",
+            updaterPreloadPath
+        );
+
+
+        return;
+    }
+
+
+    try {
+
+        session.defaultSession
+            .registerPreloadScript({
+                type:
+                    "frame",
+
+                id:
+                    "sharkord-updater-ui",
+
+                filePath:
+                updaterPreloadPath
+            });
+
+
+        console.log(
+            "[Updater UI] preload registrado."
+        );
+
+    } catch (error) {
+
+        console.error(
+            "[Updater UI] erro registrando preload:",
+            error
+        );
+    }
+}
+
+
+// ======================================================
 // ELECTRON READY
 // ======================================================
 
@@ -5270,6 +5328,9 @@ app.whenReady().then(
 
 
         registerMemberRolesPreload();
+
+
+        registerUpdaterPreload();
 
 
         configureSharkordApiLogger();
