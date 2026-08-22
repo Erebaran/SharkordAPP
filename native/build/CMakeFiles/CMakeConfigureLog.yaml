@@ -1,0 +1,948 @@
+
+---
+events:
+  -
+    kind: "message-v1"
+    backtrace:
+      - "G:/Visual Studio/Common7/IDE/CommonExtensions/Microsoft/CMake/CMake/share/cmake-4.3/Modules/CMakeDetermineSystem.cmake:212 (message)"
+      - "CMakeLists.txt:3 (project)"
+    message: |
+      The system is: Windows - 10.0.26200 - AMD64
+  -
+    kind: "find-v1"
+    backtrace:
+      - "G:/Visual Studio/Common7/IDE/CommonExtensions/Microsoft/CMake/CMake/share/cmake-4.3/Modules/CMakeDetermineCompilerId.cmake:468 (find_file)"
+      - "G:/Visual Studio/Common7/IDE/CommonExtensions/Microsoft/CMake/CMake/share/cmake-4.3/Modules/CMakeDetermineCompilerId.cmake:506 (CMAKE_DETERMINE_COMPILER_ID_WRITE)"
+      - "G:/Visual Studio/Common7/IDE/CommonExtensions/Microsoft/CMake/CMake/share/cmake-4.3/Modules/CMakeDetermineCompilerId.cmake:8 (CMAKE_DETERMINE_COMPILER_ID_BUILD)"
+      - "G:/Visual Studio/Common7/IDE/CommonExtensions/Microsoft/CMake/CMake/share/cmake-4.3/Modules/CMakeDetermineCompilerId.cmake:64 (__determine_compiler_id_test)"
+      - "G:/Visual Studio/Common7/IDE/CommonExtensions/Microsoft/CMake/CMake/share/cmake-4.3/Modules/CMakeDetermineCXXCompiler.cmake:125 (CMAKE_DETERMINE_COMPILER_ID)"
+      - "CMakeLists.txt:3 (project)"
+    mode: "file"
+    variable: "src_in"
+    description: "Path to a file."
+    settings:
+      SearchFramework: "NEVER"
+      SearchAppBundle: "NEVER"
+      CMAKE_FIND_USE_CMAKE_PATH: true
+      CMAKE_FIND_USE_CMAKE_ENVIRONMENT_PATH: true
+      CMAKE_FIND_USE_SYSTEM_ENVIRONMENT_PATH: true
+      CMAKE_FIND_USE_CMAKE_SYSTEM_PATH: true
+      CMAKE_FIND_USE_INSTALL_PREFIX: true
+    names:
+      - "CMakeCXXCompilerId.cpp.in"
+    candidate_directories:
+      - "G:/Visual Studio/Common7/IDE/CommonExtensions/Microsoft/CMake/CMake/share/cmake-4.3/Modules/"
+    found: "G:/Visual Studio/Common7/IDE/CommonExtensions/Microsoft/CMake/CMake/share/cmake-4.3/Modules/CMakeCXXCompilerId.cpp.in"
+    search_context:
+      ENV{PATH}:
+        - "G:\\Visual Studio\\VC\\Tools\\MSVC\\14.51.36231\\bin\\HostX86\\x86"
+        - "G:\\Visual Studio\\Common7\\IDE\\VC\\VCPackages"
+        - "G:\\Visual Studio\\Common7\\IDE\\CommonExtensions\\Microsoft\\TestWindow"
+        - "G:\\Visual Studio\\Common7\\IDE\\CommonExtensions\\Microsoft\\TeamFoundation\\Team Explorer"
+        - "G:\\Visual Studio\\MSBuild\\Current\\bin\\Roslyn"
+        - "C:\\Program Files (x86)\\Microsoft SDKs\\Windows\\v10.0A\\bin\\NETFX 4.8.1 Tools\\"
+        - "G:\\Visual Studio\\Team Tools\\DiagnosticsHub\\Collector"
+        - "G:\\Visual Studio\\Common7\\IDE\\Extensions\\Microsoft\\CodeCoverage.Console"
+        - "G:\\WSD\\bin\\10.0.28000.0\\\\x86"
+        - "G:\\WSD\\bin\\\\x86"
+        - "G:\\Visual Studio\\\\MSBuild\\Current\\Bin\\amd64"
+        - "C:\\Windows\\Microsoft.NET\\Framework\\v4.0.30319"
+        - "G:\\Visual Studio\\Common7\\IDE\\"
+        - "G:\\Visual Studio\\Common7\\Tools\\"
+        - "C:\\Program Files\\Common Files\\Oracle\\Java\\javapath"
+        - "C:\\Windows\\system32"
+        - "C:\\Windows"
+        - "C:\\Windows\\System32\\Wbem"
+        - "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\"
+        - "C:\\Windows\\System32\\OpenSSH\\"
+        - "C:\\Program Files\\dotnet\\"
+        - "C:\\Program Files (x86)\\cloudflared\\"
+        - "C:\\Program Files\\nodejs\\"
+        - "C:\\Program Files\\Git\\cmd"
+        - "G:\\WSD\\Windows Performance Toolkit\\"
+        - "C:\\Users\\loner\\AppData\\Local\\Microsoft\\WindowsApps"
+        - "C:\\Users\\loner\\AppData\\Local\\Programs\\DockerDesktop\\resources\\bin"
+        - "C:\\Users\\loner\\.bun\\bin"
+        - "C:\\Users\\loner\\AppData\\Roaming\\npm"
+        - "G:\\Visual Studio\\Common7\\IDE\\CommonExtensions\\Microsoft\\CMake\\CMake\\bin"
+        - "G:\\Visual Studio\\Common7\\IDE\\CommonExtensions\\Microsoft\\CMake\\Ninja"
+        - "G:\\Visual Studio\\Common7\\IDE\\VC\\Linux\\bin\\ConnectionManagerExe"
+        - "G:\\Visual Studio\\VC\\vcpkg"
+      ENV{INCLUDE}:
+        - "G:\\Visual Studio\\VC\\Tools\\MSVC\\14.51.36231\\include"
+        - "G:\\Visual Studio\\VC\\Tools\\MSVC\\14.51.36231\\ATLMFC\\include"
+        - "G:\\Visual Studio\\VC\\Auxiliary\\VS\\include"
+        - "G:\\WSD\\include\\10.0.28000.0\\ucrt"
+        - "G:\\WSD\\\\include\\10.0.28000.0\\\\um"
+        - "G:\\WSD\\\\include\\10.0.28000.0\\\\shared"
+        - "G:\\WSD\\\\include\\10.0.28000.0\\\\winrt"
+        - "G:\\WSD\\\\include\\10.0.28000.0\\\\cppwinrt"
+        - "C:\\Program Files (x86)\\Windows Kits\\NETFXSDK\\4.8.1\\include\\um"
+  -
+    kind: "message-v1"
+    backtrace:
+      - "G:/Visual Studio/Common7/IDE/CommonExtensions/Microsoft/CMake/CMake/share/cmake-4.3/Modules/CMakeDetermineCompilerId.cmake:17 (message)"
+      - "G:/Visual Studio/Common7/IDE/CommonExtensions/Microsoft/CMake/CMake/share/cmake-4.3/Modules/CMakeDetermineCompilerId.cmake:64 (__determine_compiler_id_test)"
+      - "G:/Visual Studio/Common7/IDE/CommonExtensions/Microsoft/CMake/CMake/share/cmake-4.3/Modules/CMakeDetermineCXXCompiler.cmake:125 (CMAKE_DETERMINE_COMPILER_ID)"
+      - "CMakeLists.txt:3 (project)"
+    message: |
+      Compiling the CXX compiler identification source file "CMakeCXXCompilerId.cpp" succeeded.
+      Compiler:  
+      Build flags: 
+      Id flags:  
+      
+      The output was:
+      0
+      Vers├úo do MSBuild 18.10.0-1.26379.9+c88db8eb0 para .NET Framework
+      Compila├º├úo de 22/08/2026 08:14:02 iniciada.
+      
+      Projeto "I:\\Downloads\\sharkord-process-audio\\native\\build\\CMakeFiles\\4.3.1-msvc1\\CompilerIdCXX\\CompilerIdCXX.vcxproj" no n├│ 1 (destinos padr├úo).
+      PrepareForBuild:
+        Criando o diret├│rio "Debug\\".
+        A sa├¡da estruturada est├í habilitada. A formata├º├úo do diagn├│stico do compilador refletir├í a hierarquia de erros. Consulte https://aka.ms/cpp/structured-output para obter mais detalhes.
+        Criando o diret├│rio "Debug\\CompilerIdCXX.tlog\\".
+      InitializeBuildStatus:
+        Criando "Debug\\CompilerIdCXX.tlog\\unsuccessfulbuild" porque "AlwaysCreate" foi especificado.
+        Tocando "Debug\\CompilerIdCXX.tlog\\unsuccessfulbuild".
+      ClCompile:
+        G:\\Visual Studio\\VC\\Tools\\MSVC\\14.51.36231\\bin\\HostX64\\x64\\CL.exe /c /nologo /W0 /WX- /diagnostics:column /Od /D _MBCS /Gm- /EHsc /RTC1 /MDd /GS /fp:precise /Zc:wchar_t /Zc:forScope /Zc:inline /Fo"Debug\\\\" /Fd"Debug\\vc145.pdb" /external:W0 /Gd /TP /FC /errorReport:queue CMakeCXXCompilerId.cpp
+        CMakeCXXCompilerId.cpp
+      Link:
+        G:\\Visual Studio\\VC\\Tools\\MSVC\\14.51.36231\\bin\\HostX64\\x64\\link.exe /ERRORREPORT:QUEUE /OUT:".\\CompilerIdCXX.exe" /INCREMENTAL:NO /NOLOGO kernel32.lib user32.lib gdi32.lib winspool.lib comdlg32.lib advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib odbc32.lib odbccp32.lib /MANIFEST /MANIFESTUAC:"level='asInvoker' uiAccess='false'" /manifest:embed /PDB:".\\CompilerIdCXX.pdb" /SUBSYSTEM:CONSOLE /TLBID:1 /DYNAMICBASE /NXCOMPAT /IMPLIB:".\\CompilerIdCXX.lib" /MACHINE:X64 Debug\\CMakeCXXCompilerId.obj
+        CompilerIdCXX.vcxproj -> I:\\Downloads\\sharkord-process-audio\\native\\build\\CMakeFiles\\4.3.1-msvc1\\CompilerIdCXX\\CompilerIdCXX.exe
+      PostBuildEvent:
+        for %%i in (cl.exe) do @echo CMAKE_CXX_COMPILER=%%~$PATH:i
+        :VCEnd
+        CMAKE_CXX_COMPILER=G:\\Visual Studio\\VC\\Tools\\MSVC\\14.51.36231\\bin\\Hostx64\\x64\\cl.exe
+      FinalizeBuildStatus:
+        Excluindo o arquivo "Debug\\CompilerIdCXX.tlog\\unsuccessfulbuild".
+        Tocando "Debug\\CompilerIdCXX.tlog\\CompilerIdCXX.lastbuildstate".
+      Projeto de compila├º├úo pronto "I:\\Downloads\\sharkord-process-audio\\native\\build\\CMakeFiles\\4.3.1-msvc1\\CompilerIdCXX\\CompilerIdCXX.vcxproj" (destinos padr├úo).
+      
+      Compila├º├úo com ├¬xito.
+          0 Aviso(s)
+          0 Erro(s)
+      
+      Tempo Decorrido 00:00:01.28
+      
+      
+      Compilation of the CXX compiler identification source "CMakeCXXCompilerId.cpp" produced "CompilerIdCXX.exe"
+      
+      Compilation of the CXX compiler identification source "CMakeCXXCompilerId.cpp" produced "CompilerIdCXX.vcxproj"
+      
+      The CXX compiler identification is MSVC, found in:
+        I:/Downloads/sharkord-process-audio/native/build/CMakeFiles/4.3.1-msvc1/CompilerIdCXX/CompilerIdCXX.exe
+      
+  -
+    kind: "find-v1"
+    backtrace:
+      - "G:/Visual Studio/Common7/IDE/CommonExtensions/Microsoft/CMake/CMake/share/cmake-4.3/Modules/CMakeFindBinUtils.cmake:37 (find_program)"
+      - "G:/Visual Studio/Common7/IDE/CommonExtensions/Microsoft/CMake/CMake/share/cmake-4.3/Modules/CMakeFindBinUtils.cmake:65 (__resolve_tool_path)"
+      - "G:/Visual Studio/Common7/IDE/CommonExtensions/Microsoft/CMake/CMake/share/cmake-4.3/Modules/CMakeFindBinUtils.cmake:103 (__resolve_linker_path)"
+      - "G:/Visual Studio/Common7/IDE/CommonExtensions/Microsoft/CMake/CMake/share/cmake-4.3/Modules/CMakeDetermineCXXCompiler.cmake:206 (include)"
+      - "CMakeLists.txt:3 (project)"
+    mode: "program"
+    variable: "_CMAKE_TOOL_WITH_PATH"
+    description: "Path to a program."
+    settings:
+      SearchFramework: "NEVER"
+      SearchAppBundle: "NEVER"
+      CMAKE_FIND_USE_CMAKE_PATH: false
+      CMAKE_FIND_USE_CMAKE_ENVIRONMENT_PATH: false
+      CMAKE_FIND_USE_SYSTEM_ENVIRONMENT_PATH: true
+      CMAKE_FIND_USE_CMAKE_SYSTEM_PATH: true
+      CMAKE_FIND_USE_INSTALL_PREFIX: true
+    names:
+      - "link"
+    candidate_directories:
+      - "G:/Visual Studio/VC/Tools/MSVC/14.51.36231/bin/Hostx64/x64/"
+      - "G:/Visual Studio/VC/Tools/MSVC/14.51.36231/bin/Hostx86/x86/"
+      - "G:/Visual Studio/Common7/IDE/VC/vcpackages/"
+      - "G:/Visual Studio/Common7/IDE/CommonExtensions/Microsoft/TestWindow/"
+      - "G:/Visual Studio/Common7/IDE/CommonExtensions/Microsoft/TeamFoundation/Team Explorer/"
+      - "G:/Visual Studio/MSBuild/Current/Bin/Roslyn/"
+      - "C:/Program Files (x86)/Microsoft SDKs/Windows/v10.0A/bin/NETFX 4.8.1 Tools/"
+      - "G:/Visual Studio/Team Tools/DiagnosticsHub/Collector/"
+      - "G:/Visual Studio/Common7/IDE/Extensions/Microsoft/CodeCoverage.Console/"
+      - "G:/WSD/bin/10.0.28000.0/x86/"
+      - "G:/WSD/bin/x86/"
+      - "G:/Visual Studio/MSBuild/Current/Bin/amd64/"
+      - "C:/Windows/Microsoft.NET/Framework/v4.0.30319/"
+      - "G:/Visual Studio/Common7/IDE/"
+      - "G:/Visual Studio/Common7/Tools/"
+      - "C:/Program Files/Common Files/Oracle/Java/javapath/"
+      - "C:/Windows/System32/"
+      - "C:/Windows/"
+      - "C:/Windows/System32/wbem/"
+      - "C:/Windows/System32/WindowsPowerShell/v1.0/"
+      - "C:/Windows/System32/OpenSSH/"
+      - "C:/Program Files/dotnet/"
+      - "C:/Program Files (x86)/cloudflared/"
+      - "C:/Program Files/nodejs/"
+      - "C:/Program Files/Git/cmd/"
+      - "G:/WSD/Windows Performance Toolkit/"
+      - "C:/Users/loner/AppData/Local/Microsoft/WindowsApps/"
+      - "C:/Users/loner/AppData/Local/Programs/DockerDesktop/resources/bin/"
+      - "C:/Users/loner/.bun/bin/"
+      - "C:/Users/loner/AppData/Roaming/npm/"
+      - "G:/Visual Studio/Common7/IDE/CommonExtensions/Microsoft/CMake/CMake/bin/"
+      - "G:/Visual Studio/Common7/IDE/CommonExtensions/Microsoft/CMake/Ninja/"
+      - "G:/Visual Studio/Common7/IDE/VC/Linux/bin/ConnectionManagerExe/"
+      - "G:/Visual Studio/VC/vcpkg/"
+    searched_directories:
+      - "G:/Visual Studio/VC/Tools/MSVC/14.51.36231/bin/Hostx64/x64/link.com"
+    found: "G:/Visual Studio/VC/Tools/MSVC/14.51.36231/bin/Hostx64/x64/link.exe"
+    search_context:
+      ENV{PATH}:
+        - "G:\\Visual Studio\\VC\\Tools\\MSVC\\14.51.36231\\bin\\HostX86\\x86"
+        - "G:\\Visual Studio\\Common7\\IDE\\VC\\VCPackages"
+        - "G:\\Visual Studio\\Common7\\IDE\\CommonExtensions\\Microsoft\\TestWindow"
+        - "G:\\Visual Studio\\Common7\\IDE\\CommonExtensions\\Microsoft\\TeamFoundation\\Team Explorer"
+        - "G:\\Visual Studio\\MSBuild\\Current\\bin\\Roslyn"
+        - "C:\\Program Files (x86)\\Microsoft SDKs\\Windows\\v10.0A\\bin\\NETFX 4.8.1 Tools\\"
+        - "G:\\Visual Studio\\Team Tools\\DiagnosticsHub\\Collector"
+        - "G:\\Visual Studio\\Common7\\IDE\\Extensions\\Microsoft\\CodeCoverage.Console"
+        - "G:\\WSD\\bin\\10.0.28000.0\\\\x86"
+        - "G:\\WSD\\bin\\\\x86"
+        - "G:\\Visual Studio\\\\MSBuild\\Current\\Bin\\amd64"
+        - "C:\\Windows\\Microsoft.NET\\Framework\\v4.0.30319"
+        - "G:\\Visual Studio\\Common7\\IDE\\"
+        - "G:\\Visual Studio\\Common7\\Tools\\"
+        - "C:\\Program Files\\Common Files\\Oracle\\Java\\javapath"
+        - "C:\\Windows\\system32"
+        - "C:\\Windows"
+        - "C:\\Windows\\System32\\Wbem"
+        - "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\"
+        - "C:\\Windows\\System32\\OpenSSH\\"
+        - "C:\\Program Files\\dotnet\\"
+        - "C:\\Program Files (x86)\\cloudflared\\"
+        - "C:\\Program Files\\nodejs\\"
+        - "C:\\Program Files\\Git\\cmd"
+        - "G:\\WSD\\Windows Performance Toolkit\\"
+        - "C:\\Users\\loner\\AppData\\Local\\Microsoft\\WindowsApps"
+        - "C:\\Users\\loner\\AppData\\Local\\Programs\\DockerDesktop\\resources\\bin"
+        - "C:\\Users\\loner\\.bun\\bin"
+        - "C:\\Users\\loner\\AppData\\Roaming\\npm"
+        - "G:\\Visual Studio\\Common7\\IDE\\CommonExtensions\\Microsoft\\CMake\\CMake\\bin"
+        - "G:\\Visual Studio\\Common7\\IDE\\CommonExtensions\\Microsoft\\CMake\\Ninja"
+        - "G:\\Visual Studio\\Common7\\IDE\\VC\\Linux\\bin\\ConnectionManagerExe"
+        - "G:\\Visual Studio\\VC\\vcpkg"
+  -
+    kind: "find-v1"
+    backtrace:
+      - "G:/Visual Studio/Common7/IDE/CommonExtensions/Microsoft/CMake/CMake/share/cmake-4.3/Modules/CMakeFindBinUtils.cmake:37 (find_program)"
+      - "G:/Visual Studio/Common7/IDE/CommonExtensions/Microsoft/CMake/CMake/share/cmake-4.3/Modules/CMakeFindBinUtils.cmake:65 (__resolve_tool_path)"
+      - "G:/Visual Studio/Common7/IDE/CommonExtensions/Microsoft/CMake/CMake/share/cmake-4.3/Modules/CMakeFindBinUtils.cmake:104 (__resolve_linker_path)"
+      - "G:/Visual Studio/Common7/IDE/CommonExtensions/Microsoft/CMake/CMake/share/cmake-4.3/Modules/CMakeDetermineCXXCompiler.cmake:206 (include)"
+      - "CMakeLists.txt:3 (project)"
+    mode: "program"
+    variable: "_CMAKE_TOOL_WITH_PATH"
+    description: "Path to a program."
+    settings:
+      SearchFramework: "NEVER"
+      SearchAppBundle: "NEVER"
+      CMAKE_FIND_USE_CMAKE_PATH: false
+      CMAKE_FIND_USE_CMAKE_ENVIRONMENT_PATH: false
+      CMAKE_FIND_USE_SYSTEM_ENVIRONMENT_PATH: true
+      CMAKE_FIND_USE_CMAKE_SYSTEM_PATH: true
+      CMAKE_FIND_USE_INSTALL_PREFIX: true
+    names:
+      - "lld-link"
+    candidate_directories:
+      - "G:/Visual Studio/VC/Tools/MSVC/14.51.36231/bin/Hostx64/x64/"
+      - "G:/Visual Studio/VC/Tools/MSVC/14.51.36231/bin/Hostx86/x86/"
+      - "G:/Visual Studio/Common7/IDE/VC/vcpackages/"
+      - "G:/Visual Studio/Common7/IDE/CommonExtensions/Microsoft/TestWindow/"
+      - "G:/Visual Studio/Common7/IDE/CommonExtensions/Microsoft/TeamFoundation/Team Explorer/"
+      - "G:/Visual Studio/MSBuild/Current/Bin/Roslyn/"
+      - "C:/Program Files (x86)/Microsoft SDKs/Windows/v10.0A/bin/NETFX 4.8.1 Tools/"
+      - "G:/Visual Studio/Team Tools/DiagnosticsHub/Collector/"
+      - "G:/Visual Studio/Common7/IDE/Extensions/Microsoft/CodeCoverage.Console/"
+      - "G:/WSD/bin/10.0.28000.0/x86/"
+      - "G:/WSD/bin/x86/"
+      - "G:/Visual Studio/MSBuild/Current/Bin/amd64/"
+      - "C:/Windows/Microsoft.NET/Framework/v4.0.30319/"
+      - "G:/Visual Studio/Common7/IDE/"
+      - "G:/Visual Studio/Common7/Tools/"
+      - "C:/Program Files/Common Files/Oracle/Java/javapath/"
+      - "C:/Windows/System32/"
+      - "C:/Windows/"
+      - "C:/Windows/System32/wbem/"
+      - "C:/Windows/System32/WindowsPowerShell/v1.0/"
+      - "C:/Windows/System32/OpenSSH/"
+      - "C:/Program Files/dotnet/"
+      - "C:/Program Files (x86)/cloudflared/"
+      - "C:/Program Files/nodejs/"
+      - "C:/Program Files/Git/cmd/"
+      - "G:/WSD/Windows Performance Toolkit/"
+      - "C:/Users/loner/AppData/Local/Microsoft/WindowsApps/"
+      - "C:/Users/loner/AppData/Local/Programs/DockerDesktop/resources/bin/"
+      - "C:/Users/loner/.bun/bin/"
+      - "C:/Users/loner/AppData/Roaming/npm/"
+      - "G:/Visual Studio/Common7/IDE/CommonExtensions/Microsoft/CMake/CMake/bin/"
+      - "G:/Visual Studio/Common7/IDE/CommonExtensions/Microsoft/CMake/Ninja/"
+      - "G:/Visual Studio/Common7/IDE/VC/Linux/bin/ConnectionManagerExe/"
+      - "G:/Visual Studio/VC/vcpkg/"
+    searched_directories:
+      - "G:/Visual Studio/VC/Tools/MSVC/14.51.36231/bin/Hostx64/x64/lld-link.com"
+      - "G:/Visual Studio/VC/Tools/MSVC/14.51.36231/bin/Hostx64/x64/lld-link.exe"
+      - "G:/Visual Studio/VC/Tools/MSVC/14.51.36231/bin/Hostx64/x64/lld-link"
+      - "G:/Visual Studio/VC/Tools/MSVC/14.51.36231/bin/Hostx86/x86/lld-link.com"
+      - "G:/Visual Studio/VC/Tools/MSVC/14.51.36231/bin/Hostx86/x86/lld-link.exe"
+      - "G:/Visual Studio/VC/Tools/MSVC/14.51.36231/bin/Hostx86/x86/lld-link"
+      - "G:/Visual Studio/Common7/IDE/VC/vcpackages/lld-link.com"
+      - "G:/Visual Studio/Common7/IDE/VC/vcpackages/lld-link.exe"
+      - "G:/Visual Studio/Common7/IDE/VC/vcpackages/lld-link"
+      - "G:/Visual Studio/Common7/IDE/CommonExtensions/Microsoft/TestWindow/lld-link.com"
+      - "G:/Visual Studio/Common7/IDE/CommonExtensions/Microsoft/TestWindow/lld-link.exe"
+      - "G:/Visual Studio/Common7/IDE/CommonExtensions/Microsoft/TestWindow/lld-link"
+      - "G:/Visual Studio/Common7/IDE/CommonExtensions/Microsoft/TeamFoundation/Team Explorer/lld-link.com"
+      - "G:/Visual Studio/Common7/IDE/CommonExtensions/Microsoft/TeamFoundation/Team Explorer/lld-link.exe"
+      - "G:/Visual Studio/Common7/IDE/CommonExtensions/Microsoft/TeamFoundation/Team Explorer/lld-link"
+      - "G:/Visual Studio/MSBuild/Current/Bin/Roslyn/lld-link.com"
+      - "G:/Visual Studio/MSBuild/Current/Bin/Roslyn/lld-link.exe"
+      - "G:/Visual Studio/MSBuild/Current/Bin/Roslyn/lld-link"
+      - "C:/Program Files (x86)/Microsoft SDKs/Windows/v10.0A/bin/NETFX 4.8.1 Tools/lld-link.com"
+      - "C:/Program Files (x86)/Microsoft SDKs/Windows/v10.0A/bin/NETFX 4.8.1 Tools/lld-link.exe"
+      - "C:/Program Files (x86)/Microsoft SDKs/Windows/v10.0A/bin/NETFX 4.8.1 Tools/lld-link"
+      - "G:/Visual Studio/Team Tools/DiagnosticsHub/Collector/lld-link.com"
+      - "G:/Visual Studio/Team Tools/DiagnosticsHub/Collector/lld-link.exe"
+      - "G:/Visual Studio/Team Tools/DiagnosticsHub/Collector/lld-link"
+      - "G:/Visual Studio/Common7/IDE/Extensions/Microsoft/CodeCoverage.Console/lld-link.com"
+      - "G:/Visual Studio/Common7/IDE/Extensions/Microsoft/CodeCoverage.Console/lld-link.exe"
+      - "G:/Visual Studio/Common7/IDE/Extensions/Microsoft/CodeCoverage.Console/lld-link"
+      - "G:/WSD/bin/10.0.28000.0/x86/lld-link.com"
+      - "G:/WSD/bin/10.0.28000.0/x86/lld-link.exe"
+      - "G:/WSD/bin/10.0.28000.0/x86/lld-link"
+      - "G:/WSD/bin/x86/lld-link.com"
+      - "G:/WSD/bin/x86/lld-link.exe"
+      - "G:/WSD/bin/x86/lld-link"
+      - "G:/Visual Studio/MSBuild/Current/Bin/amd64/lld-link.com"
+      - "G:/Visual Studio/MSBuild/Current/Bin/amd64/lld-link.exe"
+      - "G:/Visual Studio/MSBuild/Current/Bin/amd64/lld-link"
+      - "C:/Windows/Microsoft.NET/Framework/v4.0.30319/lld-link.com"
+      - "C:/Windows/Microsoft.NET/Framework/v4.0.30319/lld-link.exe"
+      - "C:/Windows/Microsoft.NET/Framework/v4.0.30319/lld-link"
+      - "G:/Visual Studio/Common7/IDE/lld-link.com"
+      - "G:/Visual Studio/Common7/IDE/lld-link.exe"
+      - "G:/Visual Studio/Common7/IDE/lld-link"
+      - "G:/Visual Studio/Common7/Tools/lld-link.com"
+      - "G:/Visual Studio/Common7/Tools/lld-link.exe"
+      - "G:/Visual Studio/Common7/Tools/lld-link"
+      - "C:/Program Files/Common Files/Oracle/Java/javapath/lld-link.com"
+      - "C:/Program Files/Common Files/Oracle/Java/javapath/lld-link.exe"
+      - "C:/Program Files/Common Files/Oracle/Java/javapath/lld-link"
+      - "C:/Windows/System32/lld-link.com"
+      - "C:/Windows/System32/lld-link.exe"
+      - "C:/Windows/System32/lld-link"
+      - "C:/Windows/lld-link.com"
+      - "C:/Windows/lld-link.exe"
+      - "C:/Windows/lld-link"
+      - "C:/Windows/System32/wbem/lld-link.com"
+      - "C:/Windows/System32/wbem/lld-link.exe"
+      - "C:/Windows/System32/wbem/lld-link"
+      - "C:/Windows/System32/WindowsPowerShell/v1.0/lld-link.com"
+      - "C:/Windows/System32/WindowsPowerShell/v1.0/lld-link.exe"
+      - "C:/Windows/System32/WindowsPowerShell/v1.0/lld-link"
+      - "C:/Windows/System32/OpenSSH/lld-link.com"
+      - "C:/Windows/System32/OpenSSH/lld-link.exe"
+      - "C:/Windows/System32/OpenSSH/lld-link"
+      - "C:/Program Files/dotnet/lld-link.com"
+      - "C:/Program Files/dotnet/lld-link.exe"
+      - "C:/Program Files/dotnet/lld-link"
+      - "C:/Program Files (x86)/cloudflared/lld-link.com"
+      - "C:/Program Files (x86)/cloudflared/lld-link.exe"
+      - "C:/Program Files (x86)/cloudflared/lld-link"
+      - "C:/Program Files/nodejs/lld-link.com"
+      - "C:/Program Files/nodejs/lld-link.exe"
+      - "C:/Program Files/nodejs/lld-link"
+      - "C:/Program Files/Git/cmd/lld-link.com"
+      - "C:/Program Files/Git/cmd/lld-link.exe"
+      - "C:/Program Files/Git/cmd/lld-link"
+      - "G:/WSD/Windows Performance Toolkit/lld-link.com"
+      - "G:/WSD/Windows Performance Toolkit/lld-link.exe"
+      - "G:/WSD/Windows Performance Toolkit/lld-link"
+      - "C:/Users/loner/AppData/Local/Microsoft/WindowsApps/lld-link.com"
+      - "C:/Users/loner/AppData/Local/Microsoft/WindowsApps/lld-link.exe"
+      - "C:/Users/loner/AppData/Local/Microsoft/WindowsApps/lld-link"
+      - "C:/Users/loner/AppData/Local/Programs/DockerDesktop/resources/bin/lld-link.com"
+      - "C:/Users/loner/AppData/Local/Programs/DockerDesktop/resources/bin/lld-link.exe"
+      - "C:/Users/loner/AppData/Local/Programs/DockerDesktop/resources/bin/lld-link"
+      - "C:/Users/loner/.bun/bin/lld-link.com"
+      - "C:/Users/loner/.bun/bin/lld-link.exe"
+      - "C:/Users/loner/.bun/bin/lld-link"
+      - "C:/Users/loner/AppData/Roaming/npm/lld-link.com"
+      - "C:/Users/loner/AppData/Roaming/npm/lld-link.exe"
+      - "C:/Users/loner/AppData/Roaming/npm/lld-link"
+      - "G:/Visual Studio/Common7/IDE/CommonExtensions/Microsoft/CMake/CMake/bin/lld-link.com"
+      - "G:/Visual Studio/Common7/IDE/CommonExtensions/Microsoft/CMake/CMake/bin/lld-link.exe"
+      - "G:/Visual Studio/Common7/IDE/CommonExtensions/Microsoft/CMake/CMake/bin/lld-link"
+      - "G:/Visual Studio/Common7/IDE/CommonExtensions/Microsoft/CMake/Ninja/lld-link.com"
+      - "G:/Visual Studio/Common7/IDE/CommonExtensions/Microsoft/CMake/Ninja/lld-link.exe"
+      - "G:/Visual Studio/Common7/IDE/CommonExtensions/Microsoft/CMake/Ninja/lld-link"
+      - "G:/Visual Studio/Common7/IDE/VC/Linux/bin/ConnectionManagerExe/lld-link.com"
+      - "G:/Visual Studio/Common7/IDE/VC/Linux/bin/ConnectionManagerExe/lld-link.exe"
+      - "G:/Visual Studio/Common7/IDE/VC/Linux/bin/ConnectionManagerExe/lld-link"
+      - "G:/Visual Studio/VC/vcpkg/lld-link.com"
+      - "G:/Visual Studio/VC/vcpkg/lld-link.exe"
+      - "G:/Visual Studio/VC/vcpkg/lld-link"
+    found: false
+    search_context:
+      ENV{PATH}:
+        - "G:\\Visual Studio\\VC\\Tools\\MSVC\\14.51.36231\\bin\\HostX86\\x86"
+        - "G:\\Visual Studio\\Common7\\IDE\\VC\\VCPackages"
+        - "G:\\Visual Studio\\Common7\\IDE\\CommonExtensions\\Microsoft\\TestWindow"
+        - "G:\\Visual Studio\\Common7\\IDE\\CommonExtensions\\Microsoft\\TeamFoundation\\Team Explorer"
+        - "G:\\Visual Studio\\MSBuild\\Current\\bin\\Roslyn"
+        - "C:\\Program Files (x86)\\Microsoft SDKs\\Windows\\v10.0A\\bin\\NETFX 4.8.1 Tools\\"
+        - "G:\\Visual Studio\\Team Tools\\DiagnosticsHub\\Collector"
+        - "G:\\Visual Studio\\Common7\\IDE\\Extensions\\Microsoft\\CodeCoverage.Console"
+        - "G:\\WSD\\bin\\10.0.28000.0\\\\x86"
+        - "G:\\WSD\\bin\\\\x86"
+        - "G:\\Visual Studio\\\\MSBuild\\Current\\Bin\\amd64"
+        - "C:\\Windows\\Microsoft.NET\\Framework\\v4.0.30319"
+        - "G:\\Visual Studio\\Common7\\IDE\\"
+        - "G:\\Visual Studio\\Common7\\Tools\\"
+        - "C:\\Program Files\\Common Files\\Oracle\\Java\\javapath"
+        - "C:\\Windows\\system32"
+        - "C:\\Windows"
+        - "C:\\Windows\\System32\\Wbem"
+        - "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\"
+        - "C:\\Windows\\System32\\OpenSSH\\"
+        - "C:\\Program Files\\dotnet\\"
+        - "C:\\Program Files (x86)\\cloudflared\\"
+        - "C:\\Program Files\\nodejs\\"
+        - "C:\\Program Files\\Git\\cmd"
+        - "G:\\WSD\\Windows Performance Toolkit\\"
+        - "C:\\Users\\loner\\AppData\\Local\\Microsoft\\WindowsApps"
+        - "C:\\Users\\loner\\AppData\\Local\\Programs\\DockerDesktop\\resources\\bin"
+        - "C:\\Users\\loner\\.bun\\bin"
+        - "C:\\Users\\loner\\AppData\\Roaming\\npm"
+        - "G:\\Visual Studio\\Common7\\IDE\\CommonExtensions\\Microsoft\\CMake\\CMake\\bin"
+        - "G:\\Visual Studio\\Common7\\IDE\\CommonExtensions\\Microsoft\\CMake\\Ninja"
+        - "G:\\Visual Studio\\Common7\\IDE\\VC\\Linux\\bin\\ConnectionManagerExe"
+        - "G:\\Visual Studio\\VC\\vcpkg"
+  -
+    kind: "find-v1"
+    backtrace:
+      - "G:/Visual Studio/Common7/IDE/CommonExtensions/Microsoft/CMake/CMake/share/cmake-4.3/Modules/CMakeFindBinUtils.cmake:243 (find_program)"
+      - "G:/Visual Studio/Common7/IDE/CommonExtensions/Microsoft/CMake/CMake/share/cmake-4.3/Modules/CMakeDetermineCXXCompiler.cmake:206 (include)"
+      - "CMakeLists.txt:3 (project)"
+    mode: "program"
+    variable: "CMAKE_LINKER"
+    description: "Path to a program."
+    settings:
+      SearchFramework: "NEVER"
+      SearchAppBundle: "NEVER"
+      CMAKE_FIND_USE_CMAKE_PATH: false
+      CMAKE_FIND_USE_CMAKE_ENVIRONMENT_PATH: false
+      CMAKE_FIND_USE_SYSTEM_ENVIRONMENT_PATH: true
+      CMAKE_FIND_USE_CMAKE_SYSTEM_PATH: true
+      CMAKE_FIND_USE_INSTALL_PREFIX: true
+    names:
+      - "link"
+    candidate_directories:
+      - "G:/Visual Studio/VC/Tools/MSVC/14.51.36231/bin/Hostx64/x64/"
+      - "G:/Visual Studio/VC/Tools/MSVC/14.51.36231/bin/Hostx86/x86/"
+      - "G:/Visual Studio/Common7/IDE/VC/vcpackages/"
+      - "G:/Visual Studio/Common7/IDE/CommonExtensions/Microsoft/TestWindow/"
+      - "G:/Visual Studio/Common7/IDE/CommonExtensions/Microsoft/TeamFoundation/Team Explorer/"
+      - "G:/Visual Studio/MSBuild/Current/Bin/Roslyn/"
+      - "C:/Program Files (x86)/Microsoft SDKs/Windows/v10.0A/bin/NETFX 4.8.1 Tools/"
+      - "G:/Visual Studio/Team Tools/DiagnosticsHub/Collector/"
+      - "G:/Visual Studio/Common7/IDE/Extensions/Microsoft/CodeCoverage.Console/"
+      - "G:/WSD/bin/10.0.28000.0/x86/"
+      - "G:/WSD/bin/x86/"
+      - "G:/Visual Studio/MSBuild/Current/Bin/amd64/"
+      - "C:/Windows/Microsoft.NET/Framework/v4.0.30319/"
+      - "G:/Visual Studio/Common7/IDE/"
+      - "G:/Visual Studio/Common7/Tools/"
+      - "C:/Program Files/Common Files/Oracle/Java/javapath/"
+      - "C:/Windows/System32/"
+      - "C:/Windows/"
+      - "C:/Windows/System32/wbem/"
+      - "C:/Windows/System32/WindowsPowerShell/v1.0/"
+      - "C:/Windows/System32/OpenSSH/"
+      - "C:/Program Files/dotnet/"
+      - "C:/Program Files (x86)/cloudflared/"
+      - "C:/Program Files/nodejs/"
+      - "C:/Program Files/Git/cmd/"
+      - "G:/WSD/Windows Performance Toolkit/"
+      - "C:/Users/loner/AppData/Local/Microsoft/WindowsApps/"
+      - "C:/Users/loner/AppData/Local/Programs/DockerDesktop/resources/bin/"
+      - "C:/Users/loner/.bun/bin/"
+      - "C:/Users/loner/AppData/Roaming/npm/"
+      - "G:/Visual Studio/Common7/IDE/CommonExtensions/Microsoft/CMake/CMake/bin/"
+      - "G:/Visual Studio/Common7/IDE/CommonExtensions/Microsoft/CMake/Ninja/"
+      - "G:/Visual Studio/Common7/IDE/VC/Linux/bin/ConnectionManagerExe/"
+      - "G:/Visual Studio/VC/vcpkg/"
+    searched_directories:
+      - "G:/Visual Studio/VC/Tools/MSVC/14.51.36231/bin/Hostx64/x64/link.com"
+    found: "G:/Visual Studio/VC/Tools/MSVC/14.51.36231/bin/Hostx64/x64/link.exe"
+    search_context:
+      ENV{PATH}:
+        - "G:\\Visual Studio\\VC\\Tools\\MSVC\\14.51.36231\\bin\\HostX86\\x86"
+        - "G:\\Visual Studio\\Common7\\IDE\\VC\\VCPackages"
+        - "G:\\Visual Studio\\Common7\\IDE\\CommonExtensions\\Microsoft\\TestWindow"
+        - "G:\\Visual Studio\\Common7\\IDE\\CommonExtensions\\Microsoft\\TeamFoundation\\Team Explorer"
+        - "G:\\Visual Studio\\MSBuild\\Current\\bin\\Roslyn"
+        - "C:\\Program Files (x86)\\Microsoft SDKs\\Windows\\v10.0A\\bin\\NETFX 4.8.1 Tools\\"
+        - "G:\\Visual Studio\\Team Tools\\DiagnosticsHub\\Collector"
+        - "G:\\Visual Studio\\Common7\\IDE\\Extensions\\Microsoft\\CodeCoverage.Console"
+        - "G:\\WSD\\bin\\10.0.28000.0\\\\x86"
+        - "G:\\WSD\\bin\\\\x86"
+        - "G:\\Visual Studio\\\\MSBuild\\Current\\Bin\\amd64"
+        - "C:\\Windows\\Microsoft.NET\\Framework\\v4.0.30319"
+        - "G:\\Visual Studio\\Common7\\IDE\\"
+        - "G:\\Visual Studio\\Common7\\Tools\\"
+        - "C:\\Program Files\\Common Files\\Oracle\\Java\\javapath"
+        - "C:\\Windows\\system32"
+        - "C:\\Windows"
+        - "C:\\Windows\\System32\\Wbem"
+        - "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\"
+        - "C:\\Windows\\System32\\OpenSSH\\"
+        - "C:\\Program Files\\dotnet\\"
+        - "C:\\Program Files (x86)\\cloudflared\\"
+        - "C:\\Program Files\\nodejs\\"
+        - "C:\\Program Files\\Git\\cmd"
+        - "G:\\WSD\\Windows Performance Toolkit\\"
+        - "C:\\Users\\loner\\AppData\\Local\\Microsoft\\WindowsApps"
+        - "C:\\Users\\loner\\AppData\\Local\\Programs\\DockerDesktop\\resources\\bin"
+        - "C:\\Users\\loner\\.bun\\bin"
+        - "C:\\Users\\loner\\AppData\\Roaming\\npm"
+        - "G:\\Visual Studio\\Common7\\IDE\\CommonExtensions\\Microsoft\\CMake\\CMake\\bin"
+        - "G:\\Visual Studio\\Common7\\IDE\\CommonExtensions\\Microsoft\\CMake\\Ninja"
+        - "G:\\Visual Studio\\Common7\\IDE\\VC\\Linux\\bin\\ConnectionManagerExe"
+        - "G:\\Visual Studio\\VC\\vcpkg"
+  -
+    kind: "find-v1"
+    backtrace:
+      - "G:/Visual Studio/Common7/IDE/CommonExtensions/Microsoft/CMake/CMake/share/cmake-4.3/Modules/CMakeFindBinUtils.cmake:243 (find_program)"
+      - "G:/Visual Studio/Common7/IDE/CommonExtensions/Microsoft/CMake/CMake/share/cmake-4.3/Modules/CMakeDetermineCXXCompiler.cmake:206 (include)"
+      - "CMakeLists.txt:3 (project)"
+    mode: "program"
+    variable: "CMAKE_MT"
+    description: "Path to a program."
+    settings:
+      SearchFramework: "NEVER"
+      SearchAppBundle: "NEVER"
+      CMAKE_FIND_USE_CMAKE_PATH: false
+      CMAKE_FIND_USE_CMAKE_ENVIRONMENT_PATH: false
+      CMAKE_FIND_USE_SYSTEM_ENVIRONMENT_PATH: true
+      CMAKE_FIND_USE_CMAKE_SYSTEM_PATH: true
+      CMAKE_FIND_USE_INSTALL_PREFIX: true
+    names:
+      - "mt"
+    candidate_directories:
+      - "G:/Visual Studio/VC/Tools/MSVC/14.51.36231/bin/Hostx64/x64/"
+      - "G:/Visual Studio/VC/Tools/MSVC/14.51.36231/bin/Hostx86/x86/"
+      - "G:/Visual Studio/Common7/IDE/VC/vcpackages/"
+      - "G:/Visual Studio/Common7/IDE/CommonExtensions/Microsoft/TestWindow/"
+      - "G:/Visual Studio/Common7/IDE/CommonExtensions/Microsoft/TeamFoundation/Team Explorer/"
+      - "G:/Visual Studio/MSBuild/Current/Bin/Roslyn/"
+      - "C:/Program Files (x86)/Microsoft SDKs/Windows/v10.0A/bin/NETFX 4.8.1 Tools/"
+      - "G:/Visual Studio/Team Tools/DiagnosticsHub/Collector/"
+      - "G:/Visual Studio/Common7/IDE/Extensions/Microsoft/CodeCoverage.Console/"
+      - "G:/WSD/bin/10.0.28000.0/x86/"
+      - "G:/WSD/bin/x86/"
+      - "G:/Visual Studio/MSBuild/Current/Bin/amd64/"
+      - "C:/Windows/Microsoft.NET/Framework/v4.0.30319/"
+      - "G:/Visual Studio/Common7/IDE/"
+      - "G:/Visual Studio/Common7/Tools/"
+      - "C:/Program Files/Common Files/Oracle/Java/javapath/"
+      - "C:/Windows/System32/"
+      - "C:/Windows/"
+      - "C:/Windows/System32/wbem/"
+      - "C:/Windows/System32/WindowsPowerShell/v1.0/"
+      - "C:/Windows/System32/OpenSSH/"
+      - "C:/Program Files/dotnet/"
+      - "C:/Program Files (x86)/cloudflared/"
+      - "C:/Program Files/nodejs/"
+      - "C:/Program Files/Git/cmd/"
+      - "G:/WSD/Windows Performance Toolkit/"
+      - "C:/Users/loner/AppData/Local/Microsoft/WindowsApps/"
+      - "C:/Users/loner/AppData/Local/Programs/DockerDesktop/resources/bin/"
+      - "C:/Users/loner/.bun/bin/"
+      - "C:/Users/loner/AppData/Roaming/npm/"
+      - "G:/Visual Studio/Common7/IDE/CommonExtensions/Microsoft/CMake/CMake/bin/"
+      - "G:/Visual Studio/Common7/IDE/CommonExtensions/Microsoft/CMake/Ninja/"
+      - "G:/Visual Studio/Common7/IDE/VC/Linux/bin/ConnectionManagerExe/"
+      - "G:/Visual Studio/VC/vcpkg/"
+    searched_directories:
+      - "G:/Visual Studio/VC/Tools/MSVC/14.51.36231/bin/Hostx64/x64/mt.com"
+      - "G:/Visual Studio/VC/Tools/MSVC/14.51.36231/bin/Hostx64/x64/mt.exe"
+      - "G:/Visual Studio/VC/Tools/MSVC/14.51.36231/bin/Hostx64/x64/mt"
+      - "G:/Visual Studio/VC/Tools/MSVC/14.51.36231/bin/Hostx86/x86/mt.com"
+      - "G:/Visual Studio/VC/Tools/MSVC/14.51.36231/bin/Hostx86/x86/mt.exe"
+      - "G:/Visual Studio/VC/Tools/MSVC/14.51.36231/bin/Hostx86/x86/mt"
+      - "G:/Visual Studio/Common7/IDE/VC/vcpackages/mt.com"
+      - "G:/Visual Studio/Common7/IDE/VC/vcpackages/mt.exe"
+      - "G:/Visual Studio/Common7/IDE/VC/vcpackages/mt"
+      - "G:/Visual Studio/Common7/IDE/CommonExtensions/Microsoft/TestWindow/mt.com"
+      - "G:/Visual Studio/Common7/IDE/CommonExtensions/Microsoft/TestWindow/mt.exe"
+      - "G:/Visual Studio/Common7/IDE/CommonExtensions/Microsoft/TestWindow/mt"
+      - "G:/Visual Studio/Common7/IDE/CommonExtensions/Microsoft/TeamFoundation/Team Explorer/mt.com"
+      - "G:/Visual Studio/Common7/IDE/CommonExtensions/Microsoft/TeamFoundation/Team Explorer/mt.exe"
+      - "G:/Visual Studio/Common7/IDE/CommonExtensions/Microsoft/TeamFoundation/Team Explorer/mt"
+      - "G:/Visual Studio/MSBuild/Current/Bin/Roslyn/mt.com"
+      - "G:/Visual Studio/MSBuild/Current/Bin/Roslyn/mt.exe"
+      - "G:/Visual Studio/MSBuild/Current/Bin/Roslyn/mt"
+      - "C:/Program Files (x86)/Microsoft SDKs/Windows/v10.0A/bin/NETFX 4.8.1 Tools/mt.com"
+      - "C:/Program Files (x86)/Microsoft SDKs/Windows/v10.0A/bin/NETFX 4.8.1 Tools/mt.exe"
+      - "C:/Program Files (x86)/Microsoft SDKs/Windows/v10.0A/bin/NETFX 4.8.1 Tools/mt"
+      - "G:/Visual Studio/Team Tools/DiagnosticsHub/Collector/mt.com"
+      - "G:/Visual Studio/Team Tools/DiagnosticsHub/Collector/mt.exe"
+      - "G:/Visual Studio/Team Tools/DiagnosticsHub/Collector/mt"
+      - "G:/Visual Studio/Common7/IDE/Extensions/Microsoft/CodeCoverage.Console/mt.com"
+      - "G:/Visual Studio/Common7/IDE/Extensions/Microsoft/CodeCoverage.Console/mt.exe"
+      - "G:/Visual Studio/Common7/IDE/Extensions/Microsoft/CodeCoverage.Console/mt"
+      - "G:/WSD/bin/10.0.28000.0/x86/mt.com"
+    found: "G:/WSD/bin/10.0.28000.0/x86/mt.exe"
+    search_context:
+      ENV{PATH}:
+        - "G:\\Visual Studio\\VC\\Tools\\MSVC\\14.51.36231\\bin\\HostX86\\x86"
+        - "G:\\Visual Studio\\Common7\\IDE\\VC\\VCPackages"
+        - "G:\\Visual Studio\\Common7\\IDE\\CommonExtensions\\Microsoft\\TestWindow"
+        - "G:\\Visual Studio\\Common7\\IDE\\CommonExtensions\\Microsoft\\TeamFoundation\\Team Explorer"
+        - "G:\\Visual Studio\\MSBuild\\Current\\bin\\Roslyn"
+        - "C:\\Program Files (x86)\\Microsoft SDKs\\Windows\\v10.0A\\bin\\NETFX 4.8.1 Tools\\"
+        - "G:\\Visual Studio\\Team Tools\\DiagnosticsHub\\Collector"
+        - "G:\\Visual Studio\\Common7\\IDE\\Extensions\\Microsoft\\CodeCoverage.Console"
+        - "G:\\WSD\\bin\\10.0.28000.0\\\\x86"
+        - "G:\\WSD\\bin\\\\x86"
+        - "G:\\Visual Studio\\\\MSBuild\\Current\\Bin\\amd64"
+        - "C:\\Windows\\Microsoft.NET\\Framework\\v4.0.30319"
+        - "G:\\Visual Studio\\Common7\\IDE\\"
+        - "G:\\Visual Studio\\Common7\\Tools\\"
+        - "C:\\Program Files\\Common Files\\Oracle\\Java\\javapath"
+        - "C:\\Windows\\system32"
+        - "C:\\Windows"
+        - "C:\\Windows\\System32\\Wbem"
+        - "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\"
+        - "C:\\Windows\\System32\\OpenSSH\\"
+        - "C:\\Program Files\\dotnet\\"
+        - "C:\\Program Files (x86)\\cloudflared\\"
+        - "C:\\Program Files\\nodejs\\"
+        - "C:\\Program Files\\Git\\cmd"
+        - "G:\\WSD\\Windows Performance Toolkit\\"
+        - "C:\\Users\\loner\\AppData\\Local\\Microsoft\\WindowsApps"
+        - "C:\\Users\\loner\\AppData\\Local\\Programs\\DockerDesktop\\resources\\bin"
+        - "C:\\Users\\loner\\.bun\\bin"
+        - "C:\\Users\\loner\\AppData\\Roaming\\npm"
+        - "G:\\Visual Studio\\Common7\\IDE\\CommonExtensions\\Microsoft\\CMake\\CMake\\bin"
+        - "G:\\Visual Studio\\Common7\\IDE\\CommonExtensions\\Microsoft\\CMake\\Ninja"
+        - "G:\\Visual Studio\\Common7\\IDE\\VC\\Linux\\bin\\ConnectionManagerExe"
+        - "G:\\Visual Studio\\VC\\vcpkg"
+  -
+    kind: "find-v1"
+    backtrace:
+      - "G:/Visual Studio/Common7/IDE/CommonExtensions/Microsoft/CMake/CMake/share/cmake-4.3/Modules/CMakeFindBinUtils.cmake:243 (find_program)"
+      - "G:/Visual Studio/Common7/IDE/CommonExtensions/Microsoft/CMake/CMake/share/cmake-4.3/Modules/CMakeDetermineCXXCompiler.cmake:206 (include)"
+      - "CMakeLists.txt:3 (project)"
+    mode: "program"
+    variable: "CMAKE_AR"
+    description: "Path to a program."
+    settings:
+      SearchFramework: "NEVER"
+      SearchAppBundle: "NEVER"
+      CMAKE_FIND_USE_CMAKE_PATH: false
+      CMAKE_FIND_USE_CMAKE_ENVIRONMENT_PATH: false
+      CMAKE_FIND_USE_SYSTEM_ENVIRONMENT_PATH: true
+      CMAKE_FIND_USE_CMAKE_SYSTEM_PATH: true
+      CMAKE_FIND_USE_INSTALL_PREFIX: true
+    names:
+      - "lib"
+    candidate_directories:
+      - "G:/Visual Studio/VC/Tools/MSVC/14.51.36231/bin/Hostx64/x64/"
+      - "G:/Visual Studio/VC/Tools/MSVC/14.51.36231/bin/Hostx86/x86/"
+      - "G:/Visual Studio/Common7/IDE/VC/vcpackages/"
+      - "G:/Visual Studio/Common7/IDE/CommonExtensions/Microsoft/TestWindow/"
+      - "G:/Visual Studio/Common7/IDE/CommonExtensions/Microsoft/TeamFoundation/Team Explorer/"
+      - "G:/Visual Studio/MSBuild/Current/Bin/Roslyn/"
+      - "C:/Program Files (x86)/Microsoft SDKs/Windows/v10.0A/bin/NETFX 4.8.1 Tools/"
+      - "G:/Visual Studio/Team Tools/DiagnosticsHub/Collector/"
+      - "G:/Visual Studio/Common7/IDE/Extensions/Microsoft/CodeCoverage.Console/"
+      - "G:/WSD/bin/10.0.28000.0/x86/"
+      - "G:/WSD/bin/x86/"
+      - "G:/Visual Studio/MSBuild/Current/Bin/amd64/"
+      - "C:/Windows/Microsoft.NET/Framework/v4.0.30319/"
+      - "G:/Visual Studio/Common7/IDE/"
+      - "G:/Visual Studio/Common7/Tools/"
+      - "C:/Program Files/Common Files/Oracle/Java/javapath/"
+      - "C:/Windows/System32/"
+      - "C:/Windows/"
+      - "C:/Windows/System32/wbem/"
+      - "C:/Windows/System32/WindowsPowerShell/v1.0/"
+      - "C:/Windows/System32/OpenSSH/"
+      - "C:/Program Files/dotnet/"
+      - "C:/Program Files (x86)/cloudflared/"
+      - "C:/Program Files/nodejs/"
+      - "C:/Program Files/Git/cmd/"
+      - "G:/WSD/Windows Performance Toolkit/"
+      - "C:/Users/loner/AppData/Local/Microsoft/WindowsApps/"
+      - "C:/Users/loner/AppData/Local/Programs/DockerDesktop/resources/bin/"
+      - "C:/Users/loner/.bun/bin/"
+      - "C:/Users/loner/AppData/Roaming/npm/"
+      - "G:/Visual Studio/Common7/IDE/CommonExtensions/Microsoft/CMake/CMake/bin/"
+      - "G:/Visual Studio/Common7/IDE/CommonExtensions/Microsoft/CMake/Ninja/"
+      - "G:/Visual Studio/Common7/IDE/VC/Linux/bin/ConnectionManagerExe/"
+      - "G:/Visual Studio/VC/vcpkg/"
+    searched_directories:
+      - "G:/Visual Studio/VC/Tools/MSVC/14.51.36231/bin/Hostx64/x64/lib.com"
+    found: "G:/Visual Studio/VC/Tools/MSVC/14.51.36231/bin/Hostx64/x64/lib.exe"
+    search_context:
+      ENV{PATH}:
+        - "G:\\Visual Studio\\VC\\Tools\\MSVC\\14.51.36231\\bin\\HostX86\\x86"
+        - "G:\\Visual Studio\\Common7\\IDE\\VC\\VCPackages"
+        - "G:\\Visual Studio\\Common7\\IDE\\CommonExtensions\\Microsoft\\TestWindow"
+        - "G:\\Visual Studio\\Common7\\IDE\\CommonExtensions\\Microsoft\\TeamFoundation\\Team Explorer"
+        - "G:\\Visual Studio\\MSBuild\\Current\\bin\\Roslyn"
+        - "C:\\Program Files (x86)\\Microsoft SDKs\\Windows\\v10.0A\\bin\\NETFX 4.8.1 Tools\\"
+        - "G:\\Visual Studio\\Team Tools\\DiagnosticsHub\\Collector"
+        - "G:\\Visual Studio\\Common7\\IDE\\Extensions\\Microsoft\\CodeCoverage.Console"
+        - "G:\\WSD\\bin\\10.0.28000.0\\\\x86"
+        - "G:\\WSD\\bin\\\\x86"
+        - "G:\\Visual Studio\\\\MSBuild\\Current\\Bin\\amd64"
+        - "C:\\Windows\\Microsoft.NET\\Framework\\v4.0.30319"
+        - "G:\\Visual Studio\\Common7\\IDE\\"
+        - "G:\\Visual Studio\\Common7\\Tools\\"
+        - "C:\\Program Files\\Common Files\\Oracle\\Java\\javapath"
+        - "C:\\Windows\\system32"
+        - "C:\\Windows"
+        - "C:\\Windows\\System32\\Wbem"
+        - "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\"
+        - "C:\\Windows\\System32\\OpenSSH\\"
+        - "C:\\Program Files\\dotnet\\"
+        - "C:\\Program Files (x86)\\cloudflared\\"
+        - "C:\\Program Files\\nodejs\\"
+        - "C:\\Program Files\\Git\\cmd"
+        - "G:\\WSD\\Windows Performance Toolkit\\"
+        - "C:\\Users\\loner\\AppData\\Local\\Microsoft\\WindowsApps"
+        - "C:\\Users\\loner\\AppData\\Local\\Programs\\DockerDesktop\\resources\\bin"
+        - "C:\\Users\\loner\\.bun\\bin"
+        - "C:\\Users\\loner\\AppData\\Roaming\\npm"
+        - "G:\\Visual Studio\\Common7\\IDE\\CommonExtensions\\Microsoft\\CMake\\CMake\\bin"
+        - "G:\\Visual Studio\\Common7\\IDE\\CommonExtensions\\Microsoft\\CMake\\Ninja"
+        - "G:\\Visual Studio\\Common7\\IDE\\VC\\Linux\\bin\\ConnectionManagerExe"
+        - "G:\\Visual Studio\\VC\\vcpkg"
+  -
+    kind: "find-v1"
+    backtrace:
+      - "G:/Visual Studio/Common7/IDE/CommonExtensions/Microsoft/CMake/CMake/share/cmake-4.3/Modules/CMakeDetermineRCCompiler.cmake:40 (find_program)"
+      - "G:/Visual Studio/Common7/IDE/CommonExtensions/Microsoft/CMake/CMake/share/cmake-4.3/Modules/Platform/Windows-MSVC.cmake:596 (enable_language)"
+      - "G:/Visual Studio/Common7/IDE/CommonExtensions/Microsoft/CMake/CMake/share/cmake-4.3/Modules/Platform/Windows-MSVC.cmake:569 (__windows_compiler_msvc_enable_rc)"
+      - "G:/Visual Studio/Common7/IDE/CommonExtensions/Microsoft/CMake/CMake/share/cmake-4.3/Modules/Platform/Windows-MSVC-CXX.cmake:6 (__windows_compiler_msvc)"
+      - "G:/Visual Studio/Common7/IDE/CommonExtensions/Microsoft/CMake/CMake/share/cmake-4.3/Modules/CMakeCXXInformation.cmake:48 (include)"
+      - "CMakeLists.txt:3 (project)"
+    mode: "program"
+    variable: "CMAKE_RC_COMPILER"
+    description: "RC compiler"
+    settings:
+      SearchFramework: "NEVER"
+      SearchAppBundle: "NEVER"
+      CMAKE_FIND_USE_CMAKE_PATH: true
+      CMAKE_FIND_USE_CMAKE_ENVIRONMENT_PATH: true
+      CMAKE_FIND_USE_SYSTEM_ENVIRONMENT_PATH: true
+      CMAKE_FIND_USE_CMAKE_SYSTEM_PATH: true
+      CMAKE_FIND_USE_INSTALL_PREFIX: true
+    names:
+      - "rc"
+    candidate_directories:
+      - "G:/Visual Studio/VC/Tools/MSVC/14.51.36231/bin/Hostx86/x86/"
+      - "G:/Visual Studio/Common7/IDE/VC/vcpackages/"
+      - "G:/Visual Studio/Common7/IDE/CommonExtensions/Microsoft/TestWindow/"
+      - "G:/Visual Studio/Common7/IDE/CommonExtensions/Microsoft/TeamFoundation/Team Explorer/"
+      - "G:/Visual Studio/MSBuild/Current/Bin/Roslyn/"
+      - "C:/Program Files (x86)/Microsoft SDKs/Windows/v10.0A/bin/NETFX 4.8.1 Tools/"
+      - "G:/Visual Studio/Team Tools/DiagnosticsHub/Collector/"
+      - "G:/Visual Studio/Common7/IDE/Extensions/Microsoft/CodeCoverage.Console/"
+      - "G:/WSD/bin/10.0.28000.0/x86/"
+      - "G:/WSD/bin/x86/"
+      - "G:/Visual Studio/MSBuild/Current/Bin/amd64/"
+      - "C:/Windows/Microsoft.NET/Framework/v4.0.30319/"
+      - "G:/Visual Studio/Common7/IDE/"
+      - "G:/Visual Studio/Common7/Tools/"
+      - "C:/Program Files/Common Files/Oracle/Java/javapath/"
+      - "C:/Windows/System32/"
+      - "C:/Windows/"
+      - "C:/Windows/System32/wbem/"
+      - "C:/Windows/System32/WindowsPowerShell/v1.0/"
+      - "C:/Windows/System32/OpenSSH/"
+      - "C:/Program Files/dotnet/"
+      - "C:/Program Files (x86)/cloudflared/"
+      - "C:/Program Files/nodejs/"
+      - "C:/Program Files/Git/cmd/"
+      - "G:/WSD/Windows Performance Toolkit/"
+      - "C:/Users/loner/AppData/Local/Microsoft/WindowsApps/"
+      - "C:/Users/loner/AppData/Local/Programs/DockerDesktop/resources/bin/"
+      - "C:/Users/loner/.bun/bin/"
+      - "C:/Users/loner/AppData/Roaming/npm/"
+      - "G:/Visual Studio/Common7/IDE/CommonExtensions/Microsoft/CMake/CMake/bin/"
+      - "G:/Visual Studio/Common7/IDE/CommonExtensions/Microsoft/CMake/Ninja/"
+      - "G:/Visual Studio/Common7/IDE/VC/Linux/bin/ConnectionManagerExe/"
+      - "G:/Visual Studio/VC/vcpkg/"
+      - "C:/Program Files/bin/"
+      - "C:/Program Files/sbin/"
+      - "C:/Program Files/"
+      - "C:/Program Files (x86)/bin/"
+      - "C:/Program Files (x86)/sbin/"
+      - "C:/Program Files (x86)/"
+      - "G:/Visual Studio/Common7/IDE/CommonExtensions/Microsoft/CMake/CMake/bin/"
+      - "G:/Visual Studio/Common7/IDE/CommonExtensions/Microsoft/CMake/CMake/sbin/"
+      - "G:/Visual Studio/Common7/IDE/CommonExtensions/Microsoft/CMake/CMake/"
+      - "C:/Program Files/SharkordProcessAudio/bin/"
+      - "C:/Program Files/SharkordProcessAudio/sbin/"
+      - "C:/Program Files/SharkordProcessAudio/"
+    searched_directories:
+      - "G:/Visual Studio/VC/Tools/MSVC/14.51.36231/bin/Hostx86/x86/rc.com"
+      - "G:/Visual Studio/VC/Tools/MSVC/14.51.36231/bin/Hostx86/x86/rc.exe"
+      - "G:/Visual Studio/VC/Tools/MSVC/14.51.36231/bin/Hostx86/x86/rc"
+      - "G:/Visual Studio/Common7/IDE/VC/vcpackages/rc.com"
+      - "G:/Visual Studio/Common7/IDE/VC/vcpackages/rc.exe"
+      - "G:/Visual Studio/Common7/IDE/VC/vcpackages/rc"
+      - "G:/Visual Studio/Common7/IDE/CommonExtensions/Microsoft/TestWindow/rc.com"
+      - "G:/Visual Studio/Common7/IDE/CommonExtensions/Microsoft/TestWindow/rc.exe"
+      - "G:/Visual Studio/Common7/IDE/CommonExtensions/Microsoft/TestWindow/rc"
+      - "G:/Visual Studio/Common7/IDE/CommonExtensions/Microsoft/TeamFoundation/Team Explorer/rc.com"
+      - "G:/Visual Studio/Common7/IDE/CommonExtensions/Microsoft/TeamFoundation/Team Explorer/rc.exe"
+      - "G:/Visual Studio/Common7/IDE/CommonExtensions/Microsoft/TeamFoundation/Team Explorer/rc"
+      - "G:/Visual Studio/MSBuild/Current/Bin/Roslyn/rc.com"
+      - "G:/Visual Studio/MSBuild/Current/Bin/Roslyn/rc.exe"
+      - "G:/Visual Studio/MSBuild/Current/Bin/Roslyn/rc"
+      - "C:/Program Files (x86)/Microsoft SDKs/Windows/v10.0A/bin/NETFX 4.8.1 Tools/rc.com"
+      - "C:/Program Files (x86)/Microsoft SDKs/Windows/v10.0A/bin/NETFX 4.8.1 Tools/rc.exe"
+      - "C:/Program Files (x86)/Microsoft SDKs/Windows/v10.0A/bin/NETFX 4.8.1 Tools/rc"
+      - "G:/Visual Studio/Team Tools/DiagnosticsHub/Collector/rc.com"
+      - "G:/Visual Studio/Team Tools/DiagnosticsHub/Collector/rc.exe"
+      - "G:/Visual Studio/Team Tools/DiagnosticsHub/Collector/rc"
+      - "G:/Visual Studio/Common7/IDE/Extensions/Microsoft/CodeCoverage.Console/rc.com"
+      - "G:/Visual Studio/Common7/IDE/Extensions/Microsoft/CodeCoverage.Console/rc.exe"
+      - "G:/Visual Studio/Common7/IDE/Extensions/Microsoft/CodeCoverage.Console/rc"
+      - "G:/WSD/bin/10.0.28000.0/x86/rc.com"
+    found: "G:/WSD/bin/10.0.28000.0/x86/rc.exe"
+    search_context:
+      ENV{PATH}:
+        - "G:\\Visual Studio\\VC\\Tools\\MSVC\\14.51.36231\\bin\\HostX86\\x86"
+        - "G:\\Visual Studio\\Common7\\IDE\\VC\\VCPackages"
+        - "G:\\Visual Studio\\Common7\\IDE\\CommonExtensions\\Microsoft\\TestWindow"
+        - "G:\\Visual Studio\\Common7\\IDE\\CommonExtensions\\Microsoft\\TeamFoundation\\Team Explorer"
+        - "G:\\Visual Studio\\MSBuild\\Current\\bin\\Roslyn"
+        - "C:\\Program Files (x86)\\Microsoft SDKs\\Windows\\v10.0A\\bin\\NETFX 4.8.1 Tools\\"
+        - "G:\\Visual Studio\\Team Tools\\DiagnosticsHub\\Collector"
+        - "G:\\Visual Studio\\Common7\\IDE\\Extensions\\Microsoft\\CodeCoverage.Console"
+        - "G:\\WSD\\bin\\10.0.28000.0\\\\x86"
+        - "G:\\WSD\\bin\\\\x86"
+        - "G:\\Visual Studio\\\\MSBuild\\Current\\Bin\\amd64"
+        - "C:\\Windows\\Microsoft.NET\\Framework\\v4.0.30319"
+        - "G:\\Visual Studio\\Common7\\IDE\\"
+        - "G:\\Visual Studio\\Common7\\Tools\\"
+        - "C:\\Program Files\\Common Files\\Oracle\\Java\\javapath"
+        - "C:\\Windows\\system32"
+        - "C:\\Windows"
+        - "C:\\Windows\\System32\\Wbem"
+        - "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\"
+        - "C:\\Windows\\System32\\OpenSSH\\"
+        - "C:\\Program Files\\dotnet\\"
+        - "C:\\Program Files (x86)\\cloudflared\\"
+        - "C:\\Program Files\\nodejs\\"
+        - "C:\\Program Files\\Git\\cmd"
+        - "G:\\WSD\\Windows Performance Toolkit\\"
+        - "C:\\Users\\loner\\AppData\\Local\\Microsoft\\WindowsApps"
+        - "C:\\Users\\loner\\AppData\\Local\\Programs\\DockerDesktop\\resources\\bin"
+        - "C:\\Users\\loner\\.bun\\bin"
+        - "C:\\Users\\loner\\AppData\\Roaming\\npm"
+        - "G:\\Visual Studio\\Common7\\IDE\\CommonExtensions\\Microsoft\\CMake\\CMake\\bin"
+        - "G:\\Visual Studio\\Common7\\IDE\\CommonExtensions\\Microsoft\\CMake\\Ninja"
+        - "G:\\Visual Studio\\Common7\\IDE\\VC\\Linux\\bin\\ConnectionManagerExe"
+        - "G:\\Visual Studio\\VC\\vcpkg"
+      CMAKE_INSTALL_PREFIX: "C:/Program Files/SharkordProcessAudio"
+      CMAKE_SYSTEM_PREFIX_PATH:
+        - "C:/Program Files"
+        - "C:/Program Files (x86)"
+        - "G:/Visual Studio/Common7/IDE/CommonExtensions/Microsoft/CMake/CMake"
+        - "C:/Program Files/SharkordProcessAudio"
+  -
+    kind: "try_compile-v1"
+    backtrace:
+      - "G:/Visual Studio/Common7/IDE/CommonExtensions/Microsoft/CMake/CMake/share/cmake-4.3/Modules/CMakeDetermineCompilerABI.cmake:83 (try_compile)"
+      - "G:/Visual Studio/Common7/IDE/CommonExtensions/Microsoft/CMake/CMake/share/cmake-4.3/Modules/CMakeTestCXXCompiler.cmake:26 (CMAKE_DETERMINE_COMPILER_ABI)"
+      - "CMakeLists.txt:3 (project)"
+    checks:
+      - "Detecting CXX compiler ABI info"
+    directories:
+      source: "I:/Downloads/sharkord-process-audio/native/build/CMakeFiles/CMakeScratch/TryCompile-p5sza0"
+      binary: "I:/Downloads/sharkord-process-audio/native/build/CMakeFiles/CMakeScratch/TryCompile-p5sza0"
+    cmakeVariables:
+      CMAKE_CXX_FLAGS: "/DWIN32 /D_WINDOWS /EHsc"
+      CMAKE_CXX_FLAGS_DEBUG: "/Zi /Ob0 /Od /RTC1"
+      CMAKE_CXX_SCAN_FOR_MODULES: "OFF"
+      CMAKE_CXX_STDLIB_MODULES_JSON: ""
+      CMAKE_EXE_LINKER_FLAGS: "/machine:x64"
+    buildResult:
+      variable: "CMAKE_CXX_ABI_COMPILED"
+      cached: true
+      stdout: |
+        Change Dir: 'I:/Downloads/sharkord-process-audio/native/build/CMakeFiles/CMakeScratch/TryCompile-p5sza0'
+        
+        Run Build Command(s): "G:/Visual Studio/MSBuild/Current/Bin/amd64/MSBuild.exe" cmTC_ab209.vcxproj /p:Configuration=Debug /p:Platform=x64 /p:VisualStudioVersion=18.0 /v:n
+        Vers├úo do MSBuild 18.10.0-1.26379.9+c88db8eb0 para .NET Framework
+        Compila├º├úo de 22/08/2026 08:14:04 iniciada.
+        
+        Projeto "I:\\Downloads\\sharkord-process-audio\\native\\build\\CMakeFiles\\CMakeScratch\\TryCompile-p5sza0\\cmTC_ab209.vcxproj" no n├│ 1 (destinos padr├úo).
+        PrepareForBuild:
+          A sa├¡da estruturada est├í habilitada. A formata├º├úo do diagn├│stico do compilador refletir├í a hierarquia de erros. Consulte https://aka.ms/cpp/structured-output para obter mais detalhes.
+          Criando o diret├│rio "I:\\Downloads\\sharkord-process-audio\\native\\build\\CMakeFiles\\CMakeScratch\\TryCompile-p5sza0\\Debug\\".
+          Criando o diret├│rio "cmTC_ab209.dir\\Debug\\cmTC_ab209.tlog\\".
+        InitializeBuildStatus:
+          Criando "cmTC_ab209.dir\\Debug\\cmTC_ab209.tlog\\unsuccessfulbuild" porque "AlwaysCreate" foi especificado.
+          Tocando "cmTC_ab209.dir\\Debug\\cmTC_ab209.tlog\\unsuccessfulbuild".
+        ClCompile:
+          G:\\Visual Studio\\VC\\Tools\\MSVC\\14.51.36231\\bin\\HostX64\\x64\\CL.exe /c /Zi /W1 /WX- /diagnostics:column /Od /Ob0 /D _MBCS /D WIN32 /D _WINDOWS /D _MBCS /D "CMAKE_INTDIR=\\"Debug\\"" /EHsc /RTC1 /MDd /Fo"cmTC_ab209.dir\\Debug\\\\" /Fd"cmTC_ab209.dir\\Debug\\vc145.pdb" /external:W1 /TP /errorReport:queue "G:\\Visual Studio\\Common7\\IDE\\CommonExtensions\\Microsoft\\CMake\\CMake\\share\\cmake-4.3\\Modules\\CMakeCXXCompilerABI.cpp"
+          Microsoft (R) C/C++ Optimizing Compiler Version 19.51.36256 for x64
+          Copyright (C) Microsoft Corporation. Todos os direitos reservados.
+          cl /c /Zi /W1 /WX- /diagnostics:column /Od /Ob0 /D _MBCS /D WIN32 /D _WINDOWS /D _MBCS /D "CMAKE_INTDIR=\\"Debug\\"" /EHsc /RTC1 /MDd /Fo"cmTC_ab209.dir\\Debug\\\\" /Fd"cmTC_ab209.dir\\Debug\\vc145.pdb" /external:W1 /TP /errorReport:queue "G:\\Visual Studio\\Common7\\IDE\\CommonExtensions\\Microsoft\\CMake\\CMake\\share\\cmake-4.3\\Modules\\CMakeCXXCompilerABI.cpp"
+          CMakeCXXCompilerABI.cpp
+        Link:
+          G:\\Visual Studio\\VC\\Tools\\MSVC\\14.51.36231\\bin\\HostX64\\x64\\link.exe /OUT:"I:\\Downloads\\sharkord-process-audio\\native\\build\\CMakeFiles\\CMakeScratch\\TryCompile-p5sza0\\Debug\\cmTC_ab209.exe" /INCREMENTAL /ILK:"cmTC_ab209.dir\\Debug\\cmTC_ab209.ilk" /NOLOGO kernel32.lib user32.lib gdi32.lib winspool.lib shell32.lib ole32.lib oleaut32.lib uuid.lib comdlg32.lib advapi32.lib /MANIFEST /MANIFESTUAC:"level='asInvoker' uiAccess='false'" /manifest:embed /DEBUG /PDB:"I:/Downloads/sharkord-process-audio/native/build/CMakeFiles/CMakeScratch/TryCompile-p5sza0/Debug/cmTC_ab209.pdb" /SUBSYSTEM:CONSOLE /TLBID:1 /IMPLIB:"I:/Downloads/sharkord-process-audio/native/build/CMakeFiles/CMakeScratch/TryCompile-p5sza0/Debug/cmTC_ab209.lib" /MACHINE:X64  /machine:x64 cmTC_ab209.dir\\Debug\\CMakeCXXCompilerABI.obj
+          cmTC_ab209.vcxproj -> I:\\Downloads\\sharkord-process-audio\\native\\build\\CMakeFiles\\CMakeScratch\\TryCompile-p5sza0\\Debug\\cmTC_ab209.exe
+        FinalizeBuildStatus:
+          Excluindo o arquivo "cmTC_ab209.dir\\Debug\\cmTC_ab209.tlog\\unsuccessfulbuild".
+          Tocando "cmTC_ab209.dir\\Debug\\cmTC_ab209.tlog\\cmTC_ab209.lastbuildstate".
+        Projeto de compila├º├úo pronto "I:\\Downloads\\sharkord-process-audio\\native\\build\\CMakeFiles\\CMakeScratch\\TryCompile-p5sza0\\cmTC_ab209.vcxproj" (destinos padr├úo).
+        
+        Compila├º├úo com ├¬xito.
+            0 Aviso(s)
+            0 Erro(s)
+        
+        Tempo Decorrido 00:00:00.67
+        
+      exitCode: 0
+  -
+    kind: "message-v1"
+    backtrace:
+      - "G:/Visual Studio/Common7/IDE/CommonExtensions/Microsoft/CMake/CMake/share/cmake-4.3/Modules/CMakeDetermineCompilerABI.cmake:253 (message)"
+      - "G:/Visual Studio/Common7/IDE/CommonExtensions/Microsoft/CMake/CMake/share/cmake-4.3/Modules/CMakeTestCXXCompiler.cmake:26 (CMAKE_DETERMINE_COMPILER_ABI)"
+      - "CMakeLists.txt:3 (project)"
+    message: |
+      Parsed CXX implicit link information:
+        link line regex: [^( *|.*[/\\])(ld[0-9]*(|\\.[a-rt-z][a-z]*|\\.s[a-np-z][a-z]*|\\.so[a-z]+)|link\\.exe|lld-link(\\.exe)?|CMAKE_LINK_STARTFILE-NOTFOUND|([^/\\]+-)?ld|collect2)[^/\\]*( |$)]
+        linker tool regex: [^[ 	]*(->|"|[0-9]+>[ 	-]*Build:[ 	0-9]+ ms[ 	]*)?[ 	]*(([^"]*[/\\])?(ld[0-9]*(|\\.[a-rt-z][a-z]*|\\.s[a-np-z][a-z]*|\\.so[a-z]+)|link\\.exe|lld-link(\\.exe)?))("|,| |$)]
+        linker tool for 'CXX': G:/Visual Studio/VC/Tools/MSVC/14.51.36231/bin/HostX64/x64/link.exe
+        implicit libs: []
+        implicit objs: []
+        implicit dirs: []
+        implicit fwks: []
+      
+      
+  -
+    kind: "message-v1"
+    backtrace:
+      - "G:/Visual Studio/Common7/IDE/CommonExtensions/Microsoft/CMake/CMake/share/cmake-4.3/Modules/Internal/CMakeDetermineLinkerId.cmake:38 (message)"
+      - "G:/Visual Studio/Common7/IDE/CommonExtensions/Microsoft/CMake/CMake/share/cmake-4.3/Modules/CMakeDetermineCompilerABI.cmake:299 (cmake_determine_linker_id)"
+      - "G:/Visual Studio/Common7/IDE/CommonExtensions/Microsoft/CMake/CMake/share/cmake-4.3/Modules/CMakeTestCXXCompiler.cmake:26 (CMAKE_DETERMINE_COMPILER_ABI)"
+      - "CMakeLists.txt:3 (project)"
+    message: |
+      Running the CXX compiler's linker: "G:/Visual Studio/VC/Tools/MSVC/14.51.36231/bin/HostX64/x64/link.exe" "-v"
+      Microsoft (R) Incremental Linker Version 14.51.36256.0
+      Copyright (C) Microsoft Corporation.  All rights reserved.
+...

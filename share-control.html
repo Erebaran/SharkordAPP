@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <title>Compartilhando</title>
+
+    <style>
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+
+            overflow: hidden;
+
+            background: transparent;
+
+            font-family:
+                    "Segoe UI",
+                    Arial,
+                    sans-serif;
+        }
+
+        .controller {
+            width: 100%;
+            height: 100%;
+
+            display: flex;
+
+            align-items: center;
+            justify-content: space-between;
+
+            gap: 12px;
+
+            padding: 10px 12px;
+
+            background:
+                    rgba(
+                            30,
+                            31,
+                            34,
+                            0.97
+                    );
+
+            color: white;
+
+            border:
+                    1px solid #454545;
+
+            border-radius: 9px;
+
+            -webkit-app-region: drag;
+        }
+
+        .status {
+            display: flex;
+
+            align-items: center;
+
+            gap: 7px;
+
+            font-size: 12px;
+
+            white-space: nowrap;
+        }
+
+        .dot {
+            color: #ed4245;
+
+            font-size: 15px;
+        }
+
+        button {
+            border: none;
+
+            padding: 7px 12px;
+
+            border-radius: 5px;
+
+            background: #5865f2;
+
+            color: white;
+
+            font-size: 12px;
+
+            font-weight: 600;
+
+            cursor: pointer;
+
+            -webkit-app-region: no-drag;
+        }
+
+        button:hover {
+            background: #4752c4;
+        }
+
+    </style>
+
+</head>
+
+<body>
+
+
+<div class="controller">
+
+    <div class="status">
+
+        <span class="dot">
+            ●
+        </span>
+
+        <span>
+            Compartilhando
+        </span>
+
+    </div>
+
+
+    <button id="switchSource">
+        Trocar fonte
+    </button>
+
+</div>
+
+
+<script>
+
+    const button =
+        document.getElementById(
+            "switchSource"
+        );
+
+
+    button.addEventListener(
+        "click",
+        () => {
+
+            window
+                .shareControl
+                .switchSource();
+        }
+    );
+
+</script>
+
+
+</body>
+
+</html>

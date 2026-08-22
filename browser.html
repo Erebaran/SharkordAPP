@@ -1,0 +1,564 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <title>Sharkord Browser</title>
+
+    <style>
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+
+            height: 100vh;
+
+            background: #1e1f22;
+            color: white;
+
+            font-family:
+                    "Segoe UI",
+                    Arial,
+                    sans-serif;
+
+            overflow: hidden;
+        }
+
+
+        #tabs {
+            height: 42px;
+
+            display: flex;
+            align-items: center;
+
+            background: #1a1b1e;
+
+            padding: 4px 8px;
+
+            gap: 4px;
+        }
+
+
+        .tab {
+            height: 34px;
+
+            max-width: 180px;
+
+            padding: 0 10px;
+
+            display: flex;
+            align-items: center;
+
+            gap: 8px;
+
+            background: #27282c;
+
+            border-radius: 6px 6px 0 0;
+
+            cursor: pointer;
+
+            font-size: 12px;
+        }
+
+
+        .tab.active {
+            background: #35363b;
+        }
+
+
+        .tab-title {
+            flex: 1;
+
+            overflow: hidden;
+
+            white-space: nowrap;
+
+            text-overflow: ellipsis;
+        }
+
+
+        .close {
+            opacity: .6;
+
+            font-size: 14px;
+        }
+
+
+        .close:hover {
+            opacity: 1;
+        }
+
+
+        #newTab {
+            width: 30px;
+            height: 30px;
+
+            border: none;
+
+            background: transparent;
+            color: white;
+
+            font-size: 20px;
+
+            cursor: pointer;
+        }
+
+
+        #toolbar {
+            height: 48px;
+
+            display: flex;
+            align-items: center;
+
+            gap: 6px;
+
+            padding: 7px;
+
+            background: #2b2d31;
+        }
+
+
+        .navButton {
+            width: 34px;
+            height: 34px;
+
+            border: none;
+
+            border-radius: 5px;
+
+            background: transparent;
+            color: white;
+
+            cursor: pointer;
+        }
+
+
+        .navButton:hover {
+            background: #3c3e44;
+        }
+
+
+        #url {
+            flex: 1;
+
+            height: 34px;
+
+            padding: 0 12px;
+
+            border: none;
+            border-radius: 7px;
+
+            outline: none;
+
+            background: #1e1f22;
+
+            color: white;
+        }
+
+
+        #contentPlaceholder {
+            position: absolute;
+
+            top: 90px;
+            bottom: 0;
+            left: 0;
+            right: 0;
+
+            background: #111;
+        }
+
+    </style>
+
+</head>
+
+
+<body>
+
+<div id="tabs">
+
+    <button id="newTab">
+        +
+    </button>
+
+</div>
+
+
+<div id="toolbar">
+
+    <button
+            class="navButton"
+            id="back"
+    >
+        ←
+    </button>
+
+    <button
+            class="navButton"
+            id="forward"
+    >
+        →
+    </button>
+
+    <button
+            class="navButton"
+            id="reload"
+    >
+        ↻
+    </button>
+
+
+    <input
+            id="url"
+            placeholder="Digite um endereço..."
+    >
+
+</div>
+
+
+<div id="contentPlaceholder"></div>
+
+
+<script>
+
+    const tabsElement =
+        document.getElementById(
+            "tabs"
+        );
+
+    const newTabButton =
+        document.getElementById(
+            "newTab"
+        );
+
+    const urlInput =
+        document.getElementById(
+            "url"
+        );
+
+    const backButton =
+        document.getElementById(
+            "back"
+        );
+
+    const forwardButton =
+        document.getElementById(
+            "forward"
+        );
+
+    const reloadButton =
+        document.getElementById(
+            "reload"
+        );
+
+
+    let tabs = [];
+
+    let activeTabId = null;
+
+
+    // ======================================================
+    // DESENHAR ABAS
+    // ======================================================
+
+    function renderTabs() {
+
+        document
+            .querySelectorAll(
+                ".tab"
+            )
+            .forEach(
+                tab => tab.remove()
+            );
+
+
+        for (
+            const tab
+            of tabs
+            ) {
+
+            const element =
+                document.createElement(
+                    "div"
+                );
+
+
+            element.className =
+                "tab";
+
+
+            if (
+                tab.id ===
+                activeTabId
+            ) {
+
+                element.classList.add(
+                    "active"
+                );
+            }
+
+
+            const title =
+                document.createElement(
+                    "div"
+                );
+
+
+            title.className =
+                "tab-title";
+
+
+            title.textContent =
+                tab.title ||
+                "Nova aba";
+
+
+            const close =
+                document.createElement(
+                    "span"
+                );
+
+
+            close.className =
+                "close";
+
+
+            close.textContent =
+                "×";
+
+
+            element.appendChild(
+                title
+            );
+
+
+            element.appendChild(
+                close
+            );
+
+
+            element.addEventListener(
+                "click",
+                async () => {
+
+                    await window
+                        .internalBrowser
+                        .selectTab(
+                            tab.id
+                        );
+                }
+            );
+
+
+            close.addEventListener(
+                "click",
+                async event => {
+
+                    event.stopPropagation();
+
+
+                    await window
+                        .internalBrowser
+                        .closeTab(
+                            tab.id
+                        );
+                }
+            );
+
+
+            tabsElement.insertBefore(
+                element,
+                newTabButton
+            );
+        }
+
+
+        const active =
+            tabs.find(
+                tab =>
+                    tab.id ===
+                    activeTabId
+            );
+
+
+        if (active) {
+
+            urlInput.value =
+                active.url || "";
+        }
+    }
+
+
+    // ======================================================
+    // NOVA ABA
+    // ======================================================
+
+    newTabButton.addEventListener(
+        "click",
+        async () => {
+
+            await window
+                .internalBrowser
+                .newTab(
+                    "https://www.google.com"
+                );
+        }
+    );
+
+
+    // ======================================================
+    // URL
+    // ======================================================
+
+    urlInput.addEventListener(
+        "keydown",
+        async event => {
+
+            if (
+                event.key !==
+                "Enter"
+            ) {
+                return;
+            }
+
+
+            if (!activeTabId) {
+                return;
+            }
+
+
+            let url =
+                urlInput.value.trim();
+
+
+            if (
+                !url.startsWith(
+                    "http://"
+                ) &&
+                !url.startsWith(
+                    "https://"
+                )
+            ) {
+
+                url =
+                    "https://" + url;
+            }
+
+
+            await window
+                .internalBrowser
+                .navigate(
+                    activeTabId,
+                    url
+                );
+        }
+    );
+
+
+    // ======================================================
+    // NAVEGAÇÃO
+    // ======================================================
+
+    backButton.addEventListener(
+        "click",
+        () => {
+
+            if (activeTabId) {
+
+                window
+                    .internalBrowser
+                    .back(
+                        activeTabId
+                    );
+            }
+        }
+    );
+
+
+    forwardButton.addEventListener(
+        "click",
+        () => {
+
+            if (activeTabId) {
+
+                window
+                    .internalBrowser
+                    .forward(
+                        activeTabId
+                    );
+            }
+        }
+    );
+
+
+    reloadButton.addEventListener(
+        "click",
+        () => {
+
+            if (activeTabId) {
+
+                window
+                    .internalBrowser
+                    .reload(
+                        activeTabId
+                    );
+            }
+        }
+    );
+
+
+    // ======================================================
+    // ATUALIZAÇÃO
+    // ======================================================
+
+    window
+        .internalBrowser
+        .onTabsChanged(
+            newTabs => {
+
+                tabs =
+                    newTabs.tabs;
+
+
+                activeTabId =
+                    newTabs.activeTabId;
+
+
+                renderTabs();
+            }
+        );
+
+
+    // ======================================================
+    // INICIAL
+    // ======================================================
+
+    (async () => {
+
+        const state =
+            await window
+                .internalBrowser
+                .getTabs();
+
+
+        tabs =
+            state.tabs;
+
+
+        activeTabId =
+            state.activeTabId;
+
+
+        renderTabs();
+
+    })();
+
+</script>
+
+</body>
+
+</html>

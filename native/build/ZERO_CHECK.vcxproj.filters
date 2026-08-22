@@ -1,0 +1,13 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="18.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <CustomBuild Include="I:\Downloads\sharkord-process-audio\native\build\CMakeFiles\3070471f1ee3cb2efcdc1f8cb3ffbdba\generate.stamp.rule">
+      <Filter>CMake Rules</Filter>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="CMake Rules">
+      <UniqueIdentifier>{CACD0BEE-F180-362F-A99D-E1710F4D27F8}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>

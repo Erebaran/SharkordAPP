@@ -1,0 +1,50 @@
+{
+  "name": "sharkord-desktop",
+  "version": "1.0.0",
+  "description": "Sharkord Desktop",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder --win",
+    "release": "electron-builder --win --publish always"
+  },
+  "dependencies": {
+    "electron-updater": "^6.8.9"
+  },
+  "devDependencies": {
+    "electron": "^43.4.0",
+    "electron-builder": "^26.15.3"
+  },
+  "build": {
+    "appId": "com.sharkord.desktop",
+    "productName": "Sharkord Desktop",
+    "asar": true,
+    "win": {
+      "target": "nsis",
+      "icon": "assets/sharkord.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Sharkord Desktop"
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "Erebaran",
+        "repo": "SharkordAPP"
+      }
+    ],
+    "extraResources": [
+      {
+        "from": "native",
+        "to": "native",
+        "filter": [
+          "**/*"
+        ]
+      }
+    ]
+  }
+}

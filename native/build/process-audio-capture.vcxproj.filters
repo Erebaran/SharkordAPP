@@ -1,0 +1,16 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="18.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="I:\Downloads\sharkord-process-audio\native\process-audio-capture.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="I:\Downloads\sharkord-process-audio\native\CMakeLists.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{9A62EAC7-CE1A-3D88-8D13-12F847EFFB3C}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>

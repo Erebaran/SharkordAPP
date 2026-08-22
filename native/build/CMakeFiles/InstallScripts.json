@@ -1,0 +1,7 @@
+{
+	"InstallScripts" : 
+	[
+		"I:/Downloads/sharkord-process-audio/native/build/cmake_install.cmake"
+	],
+	"Parallel" : false
+}

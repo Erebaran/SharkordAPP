@@ -1,0 +1,10 @@
+^I:\DOWNLOADS\SHARKORD-PROCESS-AUDIO\NATIVE\BUILD\CMAKEFILES\3070471F1EE3CB2EFCDC1F8CB3FFBDBA\GENERATE.STAMP.RULE
+setlocal
+"G:\Visual Studio\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -SI:/Downloads/sharkord-process-audio/native -BI:/Downloads/sharkord-process-audio/native/build --check-stamp-list CMakeFiles/generate.stamp.list --vs-solution-file I:/Downloads/sharkord-process-audio/native/build/SharkordProcessAudio.slnx
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
