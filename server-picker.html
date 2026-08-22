@@ -577,12 +577,31 @@
                 );
 
 
-            img.src =
-                profile.avatarDataUrl;
-
-
             img.alt =
                 "";
+
+
+            img.addEventListener(
+                "error",
+                () => {
+
+                    img.remove();
+
+
+                    recentAvatar.textContent =
+                        getInitials(
+                            profile.name
+                        );
+                },
+                {
+                    once:
+                        true
+                }
+            );
+
+
+            img.src =
+                profile.avatarDataUrl;
 
 
             recentAvatar.appendChild(

@@ -17,8 +17,12 @@ const fs =
     require("fs");
 
 
-const crypto =
-    require("crypto");
+const http =
+    require("http");
+
+
+const https =
+    require("https");
 
 
 const {
@@ -1991,109 +1995,103 @@ function guessServerNameFromUrl(
 }
 
 
-function getServerAssetDirectory(
-    serverUrl
-) {
-
-    const hash =
-        crypto
-            .createHash(
-                "sha1"
-            )
-            .update(
-                String(
-                    serverUrl
-                )
-            )
-            .digest(
-                "hex"
-            )
-            .slice(
-                0,
-                16
-            );
-
-
-    return path.join(
-        app.getPath(
-            "userData"
-        ),
-        "server-assets",
-        hash
-    );
-}
-
-
-function fileToDataUrl(
-    filePath
+function buildPublicServerFileUrl(
+    serverUrl,
+    fileName
 ) {
 
     if (
-        !filePath ||
-        !fs.existsSync(
-            filePath
-        )
+        !serverUrl ||
+        !fileName
     ) {
 
         return null;
     }
 
 
-    const extension =
-        path.extname(
-            filePath
+    return (
+        normalizeServerUrl(
+            serverUrl
+        ) +
+        "/public/" +
+        encodeURIComponent(
+            String(
+                fileName
+            )
         )
-            .toLowerCase();
+    );
+}
 
 
-    const mimeTypes = {
+function saveServerBrandingSnapshot(
+    input,
+    settings
+) {
 
-        ".png":
-            "image/png",
+    if (
+        !input ||
+        !settings ||
+        typeof settings !==
+        "object"
+    ) {
 
-        ".jpg":
-            "image/jpeg",
-
-        ".jpeg":
-            "image/jpeg",
-
-        ".webp":
-            "image/webp"
-    };
+        return false;
+    }
 
 
-    const mime =
-        mimeTypes[
-            extension
-            ] ||
-        "application/octet-stream";
+    let serverUrl;
 
 
     try {
 
-        const bytes =
-            fs.readFileSync(
-                filePath
+        serverUrl =
+            normalizeServerUrl(
+                input
             );
 
+    } catch {
 
-        return (
-            `data:${mime};base64,` +
-            bytes.toString(
-                "base64"
-            )
-        );
-
-    } catch (error) {
-
-        console.error(
-            "Erro lendo imagem:",
-            error
-        );
-
-
-        return null;
+        return false;
     }
+
+
+    const config =
+        readServerConfig();
+
+
+    const stored =
+        config.servers[
+            serverUrl
+            ] ||
+        {};
+
+
+    config.servers[
+        serverUrl
+        ] = {
+
+        ...stored,
+
+        name:
+            settings.name ||
+            stored.name ||
+            guessServerNameFromUrl(
+                serverUrl
+            ),
+
+        logoName:
+            settings.logo?.name ||
+            null,
+
+        bannerName:
+            settings.banner?.name ||
+            null
+    };
+
+
+    return writeServerConfig(
+        config
+    );
 }
 
 
@@ -2129,235 +2127,296 @@ function getServerProfile(
             ),
 
         avatarDataUrl:
-            fileToDataUrl(
-                stored.avatar
+            buildPublicServerFileUrl(
+                serverUrl,
+                stored.logoName
             ),
 
         bannerDataUrl:
-            fileToDataUrl(
-                stored.banner
+            buildPublicServerFileUrl(
+                serverUrl,
+                stored.bannerName
             )
     };
 }
 
 
-function saveServerImage(
-    input,
-    type,
-    sourcePath
+function sanitizeUploadFileName(
+    value
 ) {
 
-    const serverUrl =
-        normalizeServerUrl(
-            input
+    return path
+        .basename(
+            String(
+                value ||
+                "image"
+            )
+        )
+        .trim()
+        .normalize(
+            "NFKD"
+        )
+        .replace(
+            /[^\x00-\x7F]/g,
+            "_"
+        )
+        .replace(
+            /[\r\n]/g,
+            "_"
         );
+}
 
 
-    if (
-        type !==
-        "avatar" &&
-        type !==
-        "banner"
-    ) {
-
-        throw new Error(
-            "Tipo de imagem inválido."
-        );
-    }
-
+function getImageMimeType(
+    filePath
+) {
 
     const extension =
         path.extname(
-            sourcePath
+            filePath
         )
             .toLowerCase();
 
 
-    if (
-        ![
-            ".png",
-            ".jpg",
-            ".jpeg",
-            ".webp"
-        ].includes(
-            extension
-        )
-    ) {
+    const mimeTypes = {
+        ".png":
+            "image/png",
 
-        throw new Error(
-            "Formato não suportado."
-        );
-    }
+        ".jpg":
+            "image/jpeg",
 
+        ".jpeg":
+            "image/jpeg",
 
-    const directory =
-        getServerAssetDirectory(
-            serverUrl
-        );
-
-
-    fs.mkdirSync(
-        directory,
-        {
-            recursive:
-                true
-        }
-    );
-
-
-    const config =
-        readServerConfig();
-
-
-    const existing =
-        config.servers[
-            serverUrl
-            ] ||
-        {};
-
-
-    const previousPath =
-        existing[
-            type
-            ];
-
-
-    const destination =
-        path.join(
-            directory,
-            `${type}${extension}`
-        );
-
-
-    fs.copyFileSync(
-        sourcePath,
-        destination
-    );
-
-
-    if (
-        previousPath &&
-        previousPath !==
-        destination &&
-        fs.existsSync(
-            previousPath
-        )
-    ) {
-
-        try {
-
-            fs.unlinkSync(
-                previousPath
-            );
-
-        } catch {}
-    }
-
-
-    config.servers[
-        serverUrl
-        ] = {
-
-        ...existing,
-
-        name:
-            existing.name ||
-            guessServerNameFromUrl(
-                serverUrl
-            ),
-
-        [type]:
-        destination
+        ".webp":
+            "image/webp"
     };
 
 
-    writeServerConfig(
-        config
-    );
-
-
-    return getServerProfile(
-        serverUrl
-    );
+    return mimeTypes[
+            extension
+            ] ||
+        null;
 }
 
 
-function removeServerImage(
-    input,
-    type
+function uploadBrandingFileToServer(
+    serverUrl,
+    token,
+    filePath
 ) {
 
-    const serverUrl =
-        normalizeServerUrl(
-            input
-        );
+    return new Promise(
+        (
+            resolve,
+            reject
+        ) => {
+
+            const mimeType =
+                getImageMimeType(
+                    filePath
+                );
 
 
-    if (
-        type !==
-        "avatar" &&
-        type !==
-        "banner"
-    ) {
+            if (
+                !mimeType
+            ) {
 
-        throw new Error(
-            "Tipo de imagem inválido."
-        );
-    }
+                reject(
+                    new Error(
+                        "Formato não suportado. Use PNG, JPG, JPEG ou WEBP."
+                    )
+                );
 
 
-    const config =
-        readServerConfig();
+                return;
+            }
 
 
-    const existing =
-        config.servers[
-            serverUrl
-            ] ||
-        {};
+            const stats =
+                fs.statSync(
+                    filePath
+                );
 
 
-    const filePath =
-        existing[
-            type
-            ];
+            const originalName =
+                sanitizeUploadFileName(
+                    path.basename(
+                        filePath
+                    )
+                );
 
 
-    if (
-        filePath &&
-        fs.existsSync(
-            filePath
-        )
-    ) {
+            const uploadUrl =
+                new URL(
+                    "/upload",
+                    serverUrl
+                );
 
-        try {
 
-            fs.unlinkSync(
-                filePath
+            const requestModule =
+                uploadUrl.protocol ===
+                "https:"
+                    ? https
+                    : http;
+
+
+            /*
+             * O Sharkord valida UploadHeaders.TOKEN,
+             * UploadHeaders.ORIGINAL_NAME e CONTENT_LENGTH.
+             * As instalações atuais usam os nomes abaixo.
+             * Content-Length é enviado explicitamente aqui,
+             * pois este request roda no processo principal.
+             */
+            // O cliente oficial do Sharkord envia o arquivo como octet-stream e
+            // usa headers próprios para token/nome/tipo. Como builds diferentes
+            // do Sharkord já usaram nomes ligeiramente diferentes para esses
+            // headers, enviamos os aliases compatíveis; o servidor ignora os
+            // desconhecidos e lê somente os que pertencem ao seu UploadHeaders.
+            const safeOriginalName = String(originalName || "upload")
+                .trim()
+                .normalize("NFKD")
+                .replace(/[^\x00-\x7F]/g, "_");
+
+            const contentLength = String(stats.size);
+
+            const headers = {
+                "Content-Type": "application/octet-stream",
+                "Content-Length": contentLength,
+
+                // MIME/type aliases
+                "type": mimeType,
+                "x-type": mimeType,
+                "file-type": mimeType,
+                "x-file-type": mimeType,
+                "sharkord-type": mimeType,
+                "x-sharkord-type": mimeType,
+
+                // Original filename aliases
+                "original-name": safeOriginalName,
+                "x-original-name": safeOriginalName,
+                "x-file-name": safeOriginalName,
+                "sharkord-original-name": safeOriginalName,
+                "x-sharkord-original-name": safeOriginalName,
+
+                // Authentication token aliases
+                "token": token,
+                "x-token": token,
+                "sharkord-token": token,
+                "x-sharkord-token": token
+            };
+
+
+            const request =
+                requestModule.request(
+                    uploadUrl,
+                    {
+                        method:
+                            "POST",
+
+                        headers
+                    },
+                    response => {
+
+                        const chunks =
+                            [];
+
+
+                        response.on(
+                            "data",
+                            chunk => {
+
+                                chunks.push(
+                                    Buffer.from(
+                                        chunk
+                                    )
+                                );
+                            }
+                        );
+
+
+                        response.on(
+                            "end",
+                            () => {
+
+                                const body =
+                                    Buffer.concat(
+                                        chunks
+                                    )
+                                        .toString(
+                                            "utf8"
+                                        );
+
+
+                                let data =
+                                    null;
+
+
+                                try {
+
+                                    data =
+                                        body
+                                            ? JSON.parse(
+                                                body
+                                            )
+                                            : null;
+
+                                } catch {}
+
+
+                                if (
+                                    response.statusCode >=
+                                    200 &&
+                                    response.statusCode <
+                                    300 &&
+                                    data
+                                ) {
+
+                                    resolve(
+                                        data
+                                    );
+
+
+                                    return;
+                                }
+
+
+                                const serverMessage =
+                                    data?.error ||
+                                    data?.message ||
+                                    (body && body.trim()) ||
+                                    null;
+
+                                reject(
+                                    new Error(
+                                        serverMessage
+                                            ? `Falha no upload do Sharkord (${response.statusCode || "?"}): ${serverMessage}`
+                                            : `Falha no upload do Sharkord (${response.statusCode || "?"}).`
+                                    )
+                                );
+                            }
+                        );
+                    }
+                );
+
+
+            request.on(
+                "error",
+                reject
             );
 
-        } catch {}
-    }
 
-
-    delete existing[
-        type
-        ];
-
-
-    config.servers[
-        serverUrl
-        ] =
-        existing;
-
-
-    writeServerConfig(
-        config
-    );
-
-
-    return getServerProfile(
-        serverUrl
+            fs.createReadStream(
+                filePath
+            )
+                .on(
+                    "error",
+                    reject
+                )
+                .pipe(
+                    request
+                );
+        }
     );
 }
 
@@ -2724,6 +2783,24 @@ ipcMain.handle(
                 : "avatar";
 
 
+        const token =
+            String(
+                options?.token ||
+                ""
+            )
+                .trim();
+
+
+        if (
+            !token
+        ) {
+
+            throw new Error(
+                "Token de autenticação do Sharkord não encontrado."
+            );
+        }
+
+
         const ownerWindow =
             BrowserWindow
                 .fromWebContents(
@@ -2739,7 +2816,7 @@ ipcMain.handle(
                 type ===
                 "banner"
                     ? "Escolher banner do servidor"
-                    : "Escolher avatar do servidor",
+                    : "Escolher logo do servidor",
 
             properties: [
                 "openFile"
@@ -2795,48 +2872,71 @@ ipcMain.handle(
             );
 
 
+        const maxBytes =
+            type ===
+            "banner"
+                ? 100 * 1024 * 1024
+                : 50 * 1024 * 1024;
+
+
         if (
             stats.size >
-            20 *
-            1024 *
-            1024
+            maxBytes
         ) {
 
             throw new Error(
-                "A imagem deve ter no máximo 20 MB."
+                type ===
+                "banner"
+                    ? "O banner deve ter no máximo 100 MB."
+                    : "O logo deve ter no máximo 50 MB."
             );
         }
 
 
-        const profile =
-            saveServerImage(
+        const uploadedFile =
+            await uploadBrandingFileToServer(
                 serverUrl,
-                type,
+                token,
                 selectedPath
             );
+
+
+        if (
+            !uploadedFile?.id
+        ) {
+
+            throw new Error(
+                "O Sharkord não retornou o ID do arquivo enviado."
+            );
+        }
+
+
+        console.log(
+            "[Server Branding] upload concluído:",
+            {
+                type,
+                fileId:
+                uploadedFile.id,
+                name:
+                    uploadedFile.originalName ||
+                    path.basename(
+                        selectedPath
+                    ),
+                size:
+                stats.size
+            }
+        );
 
 
         return {
             cancelled:
                 false,
 
-            profile
+            type,
+
+            file:
+            uploadedFile
         };
-    }
-);
-
-
-ipcMain.handle(
-    "server:branding:remove-image",
-    async (
-        _event,
-        options
-    ) => {
-
-        return removeServerImage(
-            options?.serverUrl,
-            options?.type
-        );
     }
 );
 
@@ -4203,6 +4303,38 @@ function attachSharkordWebSocketLogger(win) {
 
         livePublicSettings =
             compact;
+
+
+        /*
+         * Mantém apenas os metadados do branding no server.json.
+         * A imagem continua server-side; salvamos somente nome/filename
+         * para que a tela "Último servidor" consiga montar /public/<arquivo>.
+         */
+        try {
+
+            const currentUrl =
+                win.webContents
+                    .getURL();
+
+
+            if (
+                currentUrl
+            ) {
+
+                saveServerBrandingSnapshot(
+                    currentUrl,
+                    compact
+                );
+            }
+
+        } catch (error) {
+
+            console.warn(
+                "[Server Branding] não foi possível salvar snapshot para o launcher:",
+                error?.message ||
+                error
+            );
+        }
 
 
         sendBrandingSnapshot(

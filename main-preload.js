@@ -260,6 +260,17 @@ contextBridge.executeInMainWorld({
             null;
 
 
+        /*
+         * Impede que MutationObserver/watchdog reinstalem o botão
+         * "Trocar tela" durante/depois do encerramento da transmissão.
+         *
+         * Só volta para false quando uma NOVA sessão de screen share
+         * é criada com sucesso.
+         */
+        let screenShareUiStopped =
+            false;
+
+
         let switching =
             false;
 
@@ -4418,6 +4429,10 @@ contextBridge.executeInMainWorld({
                 true;
 
 
+            screenShareUiStopped =
+                true;
+
+
             console.log(
                 `[ScreenShare] FINALIZANDO: ${reason}`
             );
@@ -4819,6 +4834,21 @@ contextBridge.executeInMainWorld({
 
                     session.stopping =
                         true;
+
+
+                    /*
+                     * STOP UI LOCK:
+                     *
+                     * A barra do Sharkord é desmontada/remontada pelo React
+                     * quando o screen share termina. Sem esta trava, o
+                     * MutationObserver/watchdog pode encontrar novamente o
+                     * controle nativo e recriar o botão "Trocar tela".
+                     */
+                    screenShareUiStopped =
+                        true;
+
+
+                    removeSwitchButtons();
 
 
                     /*
@@ -5318,7 +5348,9 @@ contextBridge.executeInMainWorld({
 
 
             if (
-                !session
+                screenShareUiStopped ||
+                !session ||
+                session.stopping
             ) {
 
                 removeSwitchButtons();
@@ -5328,28 +5360,45 @@ contextBridge.executeInMainWorld({
             }
 
 
-            if (
-                session.stopping
-            ) {
-                return false;
-            }
-
-
             installVoicePanelSwitchButton();
 
             installCallBarSwitchButton();
 
 
-            const nativeStopButton =
+            /*
+             * Existem dois controles nativos capazes de encerrar
+             * a transmissão:
+             *
+             * 1. Voice connected
+             * 2. Call bar
+             *
+             * Os dois precisam marcar a sessão como "stopping".
+             * Antes, apenas o botão da call bar era monitorado.
+             */
+            const voiceStopButton =
+                findVoicePanelStopShareButton();
+
+
+            const callStopButton =
                 findActiveScreenShareButton();
 
 
             if (
-                nativeStopButton
+                voiceStopButton
             ) {
 
                 bindActiveScreenShareButton(
-                    nativeStopButton
+                    voiceStopButton
+                );
+            }
+
+
+            if (
+                callStopButton
+            ) {
+
+                bindActiveScreenShareButton(
+                    callStopButton
                 );
             }
 
@@ -5371,19 +5420,14 @@ contextBridge.executeInMainWorld({
 
 
             if (
-                !currentSession
+                screenShareUiStopped ||
+                !currentSession ||
+                currentSession.stopping
             ) {
 
                 removeSwitchButtons();
 
 
-                return;
-            }
-
-
-            if (
-                currentSession.stopping
-            ) {
                 return;
             }
 
@@ -5444,19 +5488,14 @@ contextBridge.executeInMainWorld({
                     () => {
 
                         if (
-                            !currentSession
+                            screenShareUiStopped ||
+                            !currentSession ||
+                            currentSession.stopping
                         ) {
 
                             removeSwitchButtons();
 
 
-                            return;
-                        }
-
-
-                        if (
-                            currentSession.stopping
-                        ) {
                             return;
                         }
 
@@ -5507,9 +5546,14 @@ contextBridge.executeInMainWorld({
 
 
                 if (
+                    screenShareUiStopped ||
                     !session ||
                     session.stopping
                 ) {
+
+                    removeSwitchButtons();
+
+
                     return;
                 }
 
@@ -5585,6 +5629,22 @@ contextBridge.executeInMainWorld({
                 // ------------------------------------------
                 // MONITORAR STOP
                 // ------------------------------------------
+
+                /*
+                 * O botão de parar do Voice connected e o botão
+                 * equivalente da call bar podem encerrar o share.
+                 * Monitoramos os dois para impedir que a UI custom
+                 * reapareça depois do encerramento.
+                 */
+                if (
+                    voiceStopButton
+                ) {
+
+                    bindActiveScreenShareButton(
+                        voiceStopButton
+                    );
+                }
+
 
                 if (
                     callStopButton
@@ -5753,6 +5813,14 @@ contextBridge.executeInMainWorld({
                             videoBridge.track,
                             audioBridge.track
                         ]);
+
+
+                    /*
+                     * Uma nova transmissão foi criada com sucesso.
+                     * Agora a UI de troca pode voltar a existir.
+                     */
+                    screenShareUiStopped =
+                        false;
 
 
                     currentSession = {

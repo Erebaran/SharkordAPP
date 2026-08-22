@@ -162,6 +162,685 @@ if (
 
 
     // ==================================================
+    // EDIÇÃO SERVER-SIDE
+    // ==================================================
+
+    let brandingChangeInProgress =
+        false;
+
+
+    function getSharkordToken() {
+
+        /*
+         * O cliente oficial do Sharkord v0.0.23 usa exatamente
+         * SessionStorageKey.TOKEN = "sharkord-token" para o tRPC.
+         * Não devemos varrer localStorage primeiro, pois pode existir
+         * um token de auto-login diferente da sessão atualmente aberta.
+         */
+        try {
+
+            const sessionToken =
+                sessionStorage.getItem(
+                    "sharkord-token"
+                );
+
+
+            if (
+                sessionToken
+            ) {
+
+                return sessionToken;
+            }
+
+        } catch {}
+
+
+        return null;
+    }
+
+
+    function getRememberedServerPassword() {
+
+        try {
+
+            return (
+                localStorage.getItem(
+                    "sharkord-server-password"
+                ) ||
+                null
+            );
+
+        } catch {
+
+            return null;
+        }
+    }
+
+
+    function runSharkordMutation(
+        path,
+        input,
+        token
+    ) {
+
+        return new Promise(
+            (
+                resolve,
+                reject
+            ) => {
+
+                const websocketUrl =
+                    new URL(
+                        SERVER_URL
+                    );
+
+
+                websocketUrl.protocol =
+                    websocketUrl.protocol ===
+                    "https:"
+                        ? "wss:"
+                        : "ws:";
+
+
+                websocketUrl.search =
+                    "?connectionParams=1";
+
+
+                const socket =
+                    new WebSocket(
+                        websocketUrl.toString()
+                    );
+
+
+                const handshakeId =
+                    1;
+
+                const joinId =
+                    2;
+
+                const mutationId =
+                    3;
+
+
+                let settled =
+                    false;
+
+                let handshakeSent =
+                    false;
+
+                let joinSent =
+                    false;
+
+                let mutationSent =
+                    false;
+
+
+                const finish =
+                    (
+                        error,
+                        value
+                    ) => {
+
+                        if (
+                            settled
+                        ) {
+
+                            return;
+                        }
+
+
+                        settled =
+                            true;
+
+
+                        clearTimeout(
+                            timeout
+                        );
+
+
+                        try {
+
+                            socket.close();
+
+                        } catch {}
+
+
+                        if (
+                            error
+                        ) {
+
+                            reject(
+                                error
+                            );
+
+                        } else {
+
+                            resolve(
+                                value
+                            );
+                        }
+                    };
+
+
+                const timeout =
+                    setTimeout(
+                        () => {
+
+                            finish(
+                                new Error(
+                                    "A alteração do branding demorou demais para responder."
+                                )
+                            );
+                        },
+                        15000
+                    );
+
+
+                const sendHandshake =
+                    () => {
+
+                        if (
+                            handshakeSent ||
+                            socket.readyState !== WebSocket.OPEN
+                        ) {
+
+                            return;
+                        }
+
+
+                        handshakeSent =
+                            true;
+
+
+                        socket.send(
+                            JSON.stringify({
+                                id:
+                                handshakeId,
+
+                                method:
+                                    "query",
+
+                                params: {
+                                    path:
+                                        "others.handshake"
+                                }
+                            })
+                        );
+                    };
+
+
+                const sendJoin =
+                    handshakeData => {
+
+                        if (
+                            joinSent ||
+                            socket.readyState !== WebSocket.OPEN
+                        ) {
+
+                            return;
+                        }
+
+
+                        const handshakeHash =
+                            handshakeData?.handshakeHash;
+
+
+                        if (
+                            !handshakeHash
+                        ) {
+
+                            finish(
+                                new Error(
+                                    "O Sharkord não retornou o handshakeHash necessário para autenticar a conexão."
+                                )
+                            );
+
+
+                            return;
+                        }
+
+
+                        const joinInput = {
+                            handshakeHash
+                        };
+
+
+                        if (
+                            handshakeData?.hasPassword
+                        ) {
+
+                            const password =
+                                getRememberedServerPassword();
+
+
+                            if (
+                                !password
+                            ) {
+
+                                finish(
+                                    new Error(
+                                        "O servidor exige senha e ela não está disponível no armazenamento do Sharkord."
+                                    )
+                                );
+
+
+                                return;
+                            }
+
+
+                            joinInput.password =
+                                password;
+                        }
+
+
+                        joinSent =
+                            true;
+
+
+                        socket.send(
+                            JSON.stringify({
+                                id:
+                                joinId,
+
+                                method:
+                                    "query",
+
+                                params: {
+                                    input:
+                                    joinInput,
+
+                                    path:
+                                        "others.joinServer"
+                                }
+                            })
+                        );
+                    };
+
+
+                const sendMutation =
+                    () => {
+
+                        if (
+                            mutationSent ||
+                            socket.readyState !== WebSocket.OPEN
+                        ) {
+
+                            return;
+                        }
+
+
+                        mutationSent =
+                            true;
+
+
+                        socket.send(
+                            JSON.stringify({
+                                id:
+                                mutationId,
+
+                                method:
+                                    "mutation",
+
+                                params: {
+                                    input,
+                                    path
+                                }
+                            })
+                        );
+                    };
+
+
+                socket.addEventListener(
+                    "open",
+                    () => {
+
+                        /*
+                         * O token valida a identidade da conexão, mas o Sharkord
+                         * ainda cria ctx.authenticated=false. Para acessar uma
+                         * protectedProcedure precisamos repetir o fluxo oficial:
+                         * connectionParams -> handshake -> joinServer -> mutation.
+                         */
+                        socket.send(
+                            JSON.stringify({
+                                method:
+                                    "connectionParams",
+
+                                data: {
+                                    token
+                                }
+                            })
+                        );
+
+
+                        // A primeira mensagem é reservada aos connectionParams.
+                        // Enviamos o handshake na tarefa seguinte para manter a
+                        // negociação na mesma ordem usada pelo cliente tRPC.
+                        setTimeout(
+                            sendHandshake,
+                            0
+                        );
+                    }
+                );
+
+
+                socket.addEventListener(
+                    "message",
+                    event => {
+
+                        let message;
+
+
+                        try {
+
+                            message =
+                                JSON.parse(
+                                    String(
+                                        event.data ||
+                                        ""
+                                    )
+                                );
+
+                        } catch {
+
+                            return;
+                        }
+
+
+                        const messages =
+                            Array.isArray(
+                                message
+                            )
+                                ? message
+                                : [
+                                    message
+                                ];
+
+
+                        for (
+                            const item
+                            of messages
+                            ) {
+
+                            if (
+                                item?.id === handshakeId
+                            ) {
+
+                                if (
+                                    item?.error
+                                ) {
+
+                                    finish(
+                                        new Error(
+                                            item.error?.message ||
+                                            item.error?.data?.message ||
+                                            "Falha no handshake do Sharkord."
+                                        )
+                                    );
+
+
+                                    return;
+                                }
+
+
+                                const handshakeData =
+                                    item?.result?.data?.data ||
+                                    item?.result?.data;
+
+
+                                if (
+                                    handshakeData
+                                ) {
+
+                                    sendJoin(
+                                        handshakeData
+                                    );
+                                }
+
+
+                                continue;
+                            }
+
+
+                            if (
+                                item?.id === joinId
+                            ) {
+
+                                if (
+                                    item?.error
+                                ) {
+
+                                    finish(
+                                        new Error(
+                                            item.error?.message ||
+                                            item.error?.data?.message ||
+                                            "Falha ao autenticar a conexão auxiliar do Sharkord."
+                                        )
+                                    );
+
+
+                                    return;
+                                }
+
+
+                                if (
+                                    item?.result
+                                ) {
+
+                                    sendMutation();
+                                }
+
+
+                                continue;
+                            }
+
+
+                            if (
+                                item?.id !== mutationId
+                            ) {
+
+                                continue;
+                            }
+
+
+                            if (
+                                item?.error
+                            ) {
+
+                                finish(
+                                    new Error(
+                                        item.error?.message ||
+                                        item.error?.data?.message ||
+                                        "O Sharkord recusou a alteração do branding."
+                                    )
+                                );
+
+
+                                return;
+                            }
+
+
+                            if (
+                                item?.result
+                            ) {
+
+                                finish(
+                                    null,
+                                    item.result
+                                );
+
+
+                                return;
+                            }
+                        }
+                    }
+                );
+
+
+                socket.addEventListener(
+                    "error",
+                    () => {
+
+                        finish(
+                            new Error(
+                                "Falha na conexão WebSocket usada para alterar o branding."
+                            )
+                        );
+                    }
+                );
+
+
+                socket.addEventListener(
+                    "close",
+                    () => {
+
+                        if (
+                            !settled
+                        ) {
+
+                            finish(
+                                new Error(
+                                    "A conexão com o Sharkord foi encerrada antes da confirmação."
+                                )
+                            );
+                        }
+                    }
+                );
+            }
+        );
+    }
+
+
+    async function chooseBrandingImage(
+        type,
+        element
+    ) {
+
+        if (
+            brandingChangeInProgress
+        ) {
+
+            return;
+        }
+
+
+        const token =
+            getSharkordToken();
+
+
+        if (
+            !token
+        ) {
+
+            console.error(
+                "[Server Branding] token do Sharkord não encontrado."
+            );
+
+
+            return;
+        }
+
+
+        brandingChangeInProgress =
+            true;
+
+
+        element?.setAttribute(
+            "aria-busy",
+            "true"
+        );
+
+
+        try {
+
+            const result =
+                await ipcRenderer.invoke(
+                    "server:branding:choose-image",
+                    {
+                        serverUrl:
+                        SERVER_URL,
+
+                        type,
+
+                        token
+                    }
+                );
+
+
+            if (
+                result?.cancelled
+            ) {
+
+                return;
+            }
+
+
+            const fileId =
+                result?.file?.id;
+
+
+            if (
+                !fileId
+            ) {
+
+                throw new Error(
+                    "Upload concluído sem ID de arquivo."
+                );
+            }
+
+
+            const mutationPath =
+                type ===
+                "banner"
+                    ? "others.changeBanner"
+                    : "others.changeLogo";
+
+
+            await runSharkordMutation(
+                mutationPath,
+                {
+                    fileId
+                },
+                token
+            );
+
+
+            console.log(
+                "[Server Branding] alterado no servidor:",
+                {
+                    type,
+                    fileId
+                }
+            );
+
+
+            /*
+             * Não aplicamos a imagem escolhida localmente.
+             * O servidor publica a nova configuração e o
+             * listener server-branding:server-data reaplica
+             * logo/banner a partir de /public/<arquivo>.
+             */
+
+        } catch (error) {
+
+            console.error(
+                "[Server Branding] erro alterando imagem:",
+                error
+            );
+
+        } finally {
+
+            brandingChangeInProgress =
+                false;
+
+
+            element?.removeAttribute(
+                "aria-busy"
+            );
+        }
+    }
+
+
+    // ==================================================
     // HELPERS
     // ==================================================
 
@@ -1248,10 +1927,12 @@ if (
             #${BRAND_ROOT_ID} {
                 position: relative;
                 flex: 0 0 auto;
-                width: 100%;
+                width: var(--skr-brand-sidebar-width, 100%);
+                max-width: var(--skr-brand-sidebar-width, 100%);
                 height: 166px;
                 margin: 0;
                 overflow: visible;
+                align-self: flex-start;
                 user-select: none;
                 z-index: 4;
             }
@@ -1276,6 +1957,22 @@ if (
                         #17181b 0%,
                         #27292f 100%
                     );
+            }
+
+            #${BRAND_ROOT_ID}
+            .skr-brand-banner,
+
+            #${BRAND_ROOT_ID}
+            .skr-brand-avatar-wrap {
+                cursor: pointer;
+            }
+
+            #${BRAND_ROOT_ID}
+            .skr-brand-banner[aria-busy="true"],
+
+            #${BRAND_ROOT_ID}
+            .skr-brand-avatar-wrap[aria-busy="true"] {
+                cursor: wait;
             }
 
             #${BRAND_ROOT_ID}
@@ -1780,9 +2477,77 @@ if (
             <div
                 class="skr-brand-hint"
             >
-                Branding definido pelo servidor
+                Clique no avatar ou banner para alterar
             </div>
         `;
+
+
+        const banner =
+            root.querySelector(
+                ".skr-brand-banner"
+            );
+
+
+        const avatar =
+            root.querySelector(
+                ".skr-brand-avatar-wrap"
+            );
+
+
+        banner?.setAttribute(
+            "role",
+            "button"
+        );
+
+
+        banner?.setAttribute(
+            "title",
+            "Clique para alterar o banner"
+        );
+
+
+        avatar?.setAttribute(
+            "role",
+            "button"
+        );
+
+
+        avatar?.setAttribute(
+            "title",
+            "Clique para alterar o logo"
+        );
+
+
+        banner?.addEventListener(
+            "click",
+            event => {
+
+                event.preventDefault();
+                event.stopPropagation();
+
+
+                chooseBrandingImage(
+                    "banner",
+                    banner
+                );
+            }
+        );
+
+
+        avatar?.addEventListener(
+            "click",
+            event => {
+
+                event.preventDefault();
+                event.stopPropagation();
+
+
+                chooseBrandingImage(
+                    "avatar",
+                    avatar
+                );
+            }
+        );
 
 
         return root;
@@ -1838,6 +2603,28 @@ if (
 
             console.log(
                 "[Server Branding] banner instalado."
+            );
+        }
+
+
+        // Mantém o branding preso à largura visual real da sidebar.
+        // Alguns layouts do Sharkord usam containers flex/grid maiores que a
+        // coluna de canais; width: 100% sozinho pode fazer o banner invadir
+        // a área central depois que o DOM é atualizado.
+        const sidebarWidth =
+            Math.round(
+                sidebar
+                    .getBoundingClientRect()
+                    .width
+            );
+
+        if (
+            sidebarWidth >= 180 &&
+            sidebarWidth <= 360
+        ) {
+            root.style.setProperty(
+                "--skr-brand-sidebar-width",
+                `${sidebarWidth}px`
             );
         }
 
@@ -2066,7 +2853,7 @@ if (
 
 
         console.log(
-            "[Server Branding] v3 - server-side."
+            "[Server Branding] v4 - edição server-side."
         );
     }
 
