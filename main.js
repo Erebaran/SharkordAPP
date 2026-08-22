@@ -3386,339 +3386,219 @@ function isInterestingWebSocketPayload(
 }
 
 
-function attachSharkordWebSocketLogger(
-    win
-) {
+function attachSharkordWebSocketLogger(win) {
+    if (!win || win.isDestroyed()) return;
 
-    if (
-        !win ||
-        win.isDestroyed()
-    ) {
+    const debuggerClient = win.webContents.debugger;
+    const subscriptionPathsById = new Map();
+    const liveUsers = new Map();
+    const liveRoles = new Map();
 
-        return;
+    function compactUser(user) {
+        if (!user || user.id == null) return null;
+        return {
+            id: user.id,
+            name: user.name,
+            roleIds: Array.isArray(user.roleIds) ? user.roleIds : []
+        };
     }
 
+    function compactRole(role) {
+        if (!role || role.id == null) return null;
+        return {
+            id: role.id,
+            name: role.name,
+            color: role.color || null,
+            isDefault: Boolean(role.isDefault)
+        };
+    }
 
-    const debuggerClient =
-        win.webContents.debugger;
+    function sendSnapshot(reason) {
+        if (!win || win.isDestroyed()) return;
 
+        const compactData = {
+            users: Array.from(liveUsers.values())
+                .filter(user => user && user.name !== "__deleted_user__"),
+            roles: Array.from(liveRoles.values())
+        };
 
-    try {
+        win.webContents.send("member-roles:server-data", compactData);
+        console.log("[Member Roles] dados enviados ao preload:", {
+            reason,
+            users: compactData.users.length,
+            roles: compactData.roles.length
+        });
+    }
 
-        if (
-            !debuggerClient.isAttached()
-        ) {
+    function findServerData(value, depth = 0) {
+        if (depth > 10 || !value || typeof value !== "object") return null;
+        if (Array.isArray(value.users) && Array.isArray(value.roles)) return value;
+        const children = Array.isArray(value) ? value : Object.values(value);
+        for (const child of children) {
+            const found = findServerData(child, depth + 1);
+            if (found) return found;
+        }
+        return null;
+    }
 
-            debuggerClient.attach(
-                "1.3"
-            );
+    function replaceInitialState(serverData) {
+        liveUsers.clear();
+        liveRoles.clear();
+
+        for (const rawUser of serverData.users || []) {
+            const user = compactUser(rawUser);
+            if (user && user.name !== "__deleted_user__") {
+                liveUsers.set(Number(user.id), user);
+            }
         }
 
+        for (const rawRole of serverData.roles || []) {
+            const role = compactRole(rawRole);
+            if (role) liveRoles.set(Number(role.id), role);
+        }
+
+        sendSnapshot("initial-state");
+    }
+
+    function learnSubscriptions(parsed) {
+        const list = Array.isArray(parsed) ? parsed : [parsed];
+        for (const item of list) {
+            if (
+                item?.method === "subscription" &&
+                item?.id != null &&
+                item?.params?.path
+            ) {
+                subscriptionPathsById.set(Number(item.id), String(item.params.path));
+            }
+        }
+    }
+
+    function unwrapData(message) {
+        return message?.result?.data ?? message?.result ?? message?.data ?? null;
+    }
+
+    function findEntity(value, depth = 0) {
+        if (depth > 8 || value == null) return null;
+        if (typeof value === "number" || typeof value === "string") return { id: value };
+        if (typeof value !== "object") return null;
+        if (value.id != null) return value;
+
+        for (const key of ["user", "member", "role", "data"]) {
+            if (value[key] !== undefined) {
+                const found = findEntity(value[key], depth + 1);
+                if (found) return found;
+            }
+        }
+
+        const children = Array.isArray(value) ? value : Object.values(value);
+        for (const child of children) {
+            const found = findEntity(child, depth + 1);
+            if (found) return found;
+        }
+        return null;
+    }
+
+    function applyLiveMessage(message) {
+        if (!message || message.id == null) return false;
+        const path = subscriptionPathsById.get(Number(message.id));
+        if (!path) return false;
+
+        const raw = findEntity(unwrapData(message));
+        if (!raw || raw.id == null) return false;
+
+        if (["users.onUpdate", "users.onCreate", "users.onJoin"].includes(path)) {
+            const previous = liveUsers.get(Number(raw.id)) || {};
+            const user = compactUser({ ...previous, ...raw });
+            if (!user) return false;
+            liveUsers.set(Number(user.id), user);
+            sendSnapshot(path);
+            return true;
+        }
+
+        if (["users.onDelete", "users.onLeave"].includes(path)) {
+            liveUsers.delete(Number(raw.id));
+            sendSnapshot(path);
+            return true;
+        }
+
+        if (["roles.onUpdate", "roles.onCreate"].includes(path)) {
+            const previous = liveRoles.get(Number(raw.id)) || {};
+            const role = compactRole({ ...previous, ...raw });
+            if (!role) return false;
+            liveRoles.set(Number(role.id), role);
+            sendSnapshot(path);
+            return true;
+        }
+
+        if (path === "roles.onDelete") {
+            const deletedId = Number(raw.id);
+            liveRoles.delete(deletedId);
+            for (const [id, user] of liveUsers) {
+                liveUsers.set(id, {
+                    ...user,
+                    roleIds: (user.roleIds || []).filter(roleId => Number(roleId) !== deletedId)
+                });
+            }
+            sendSnapshot(path);
+            return true;
+        }
+
+        return false;
+    }
+
+    try {
+        if (!debuggerClient.isAttached()) debuggerClient.attach("1.3");
+
+        debuggerClient.sendCommand("Network.enable").catch(error => {
+            console.error("[Sharkord WS] erro habilitando Network:", error);
+        });
+
+        debuggerClient.on("message", (_event, method, params) => {
+            const received = method === "Network.webSocketFrameReceived";
+            const sent = method === "Network.webSocketFrameSent";
+            if (!received && !sent) return;
 
-        debuggerClient
-            .sendCommand(
-                "Network.enable"
-            )
-            .catch(
-                error => {
+            const frame = params?.response;
+            if (!frame || Number(frame.opcode) !== 1) return;
 
-                    console.error(
-                        "[Sharkord WS] erro habilitando Network:",
-                        error
-                    );
-                }
-            );
+            const payload = String(frame.payloadData || "");
 
+            try {
+                const parsed = JSON.parse(payload);
 
-        debuggerClient.on(
-            "message",
-            (
-                _event,
-                method,
-                params
-            ) => {
+                if (sent) learnSubscriptions(parsed);
 
-                const received =
-                    method ===
-                    "Network.webSocketFrameReceived";
-
-
-                const sent =
-                    method ===
-                    "Network.webSocketFrameSent";
-
-
-                if (
-                    !received &&
-                    !sent
-                ) {
-
-                    return;
-                }
-
-
-                const frame =
-                    params?.response;
-
-
-                if (
-                    !frame ||
-                    Number(
-                        frame.opcode
-                    ) !==
-                    1
-                ) {
-
-                    return;
-                }
-
-
-                const payload =
-                    String(
-                        frame.payloadData ||
-                        ""
-                    );
-
-
-                if (
-                    !isInterestingWebSocketPayload(
-                        payload
-                    )
-                ) {
-
-                    return;
-                }
-
-
-                const safePayload =
-                    redactSensitiveWebSocketData(
-                        payload
-                    );
-
-
-                const MAX_LOG_LENGTH =
-                    20000;
-
-
-                const output =
-                    safePayload.length >
-                    MAX_LOG_LENGTH
-                        ? safePayload.slice(
-                            0,
-                            MAX_LOG_LENGTH
-                        ) +
-                        " ... <TRUNCATED>"
-                        : safePayload;
-
-
-                console.log(
-                    received
-                        ? "[Sharkord WS RECEIVED]"
-                        : "[Sharkord WS SENT]",
-                    output
-                );
-
-
-                /*
-                 * A resposta inicial do Sharkord traz
-                 * users[] + roles[] no mesmo payload.
-                 * Mandamos apenas esses dados para o
-                 * preload de agrupamento de membros.
-                 */
-                if (
-                    received &&
-                    win &&
-                    !win.isDestroyed()
-                ) {
-
-                    try {
-
-                        const parsed =
-                            JSON.parse(
-                                payload
-                            );
-
-
-                        const findServerData = (
-                            value,
-                            depth = 0
-                        ) => {
-
-                            if (
-                                depth > 10 ||
-                                !value ||
-                                typeof value !== "object"
-                            ) {
-
-                                return null;
-                            }
-
-
-                            if (
-                                Array.isArray(value.users) &&
-                                Array.isArray(value.roles)
-                            ) {
-
-                                return value;
-                            }
-
-
-                            if (
-                                Array.isArray(value)
-                            ) {
-
-                                for (
-                                    const item
-                                    of value
-                                    ) {
-
-                                    const found =
-                                        findServerData(
-                                            item,
-                                            depth + 1
-                                        );
-
-
-                                    if (found) {
-
-                                        return found;
-                                    }
-                                }
-
-
-                                return null;
-                            }
-
-
-                            for (
-                                const child
-                                of Object.values(value)
-                                ) {
-
-                                const found =
-                                    findServerData(
-                                        child,
-                                        depth + 1
-                                    );
-
-
-                                if (found) {
-
-                                    return found;
-                                }
-                            }
-
-
-                            return null;
-                        };
-
-
-                        const serverData =
-                            findServerData(
-                                parsed
-                            );
-
-
-                        if (serverData) {
-
-                            const compactData = {
-
-                                users:
-                                    serverData.users
-                                        .filter(
-                                            user =>
-                                                user &&
-                                                user.name !== "__deleted_user__"
-                                        )
-                                        .map(
-                                            user => ({
-
-                                                id:
-                                                user.id,
-
-                                                name:
-                                                user.name,
-
-                                                roleIds:
-                                                    Array.isArray(user.roleIds)
-                                                        ? user.roleIds
-                                                        : []
-                                            })
-                                        ),
-
-                                roles:
-                                    serverData.roles
-                                        .map(
-                                            role => ({
-
-                                                id:
-                                                role.id,
-
-                                                name:
-                                                role.name,
-
-                                                color:
-                                                    role.color || null,
-
-                                                isDefault:
-                                                    Boolean(role.isDefault)
-                                            })
-                                        )
-                            };
-
-
-                            win.webContents.send(
-                                "member-roles:server-data",
-                                compactData
-                            );
-
-
-                            console.log(
-                                "[Member Roles] dados enviados ao preload:",
-                                {
-                                    users:
-                                    compactData.users.length,
-
-                                    roles:
-                                    compactData.roles.length
-                                }
-                            );
-                        }
-
-                    } catch {
-
-                        /* frame que não é JSON útil */
+                if (received) {
+                    const list = Array.isArray(parsed) ? parsed : [parsed];
+                    for (const message of list) {
+                        const serverData = findServerData(message);
+                        if (serverData) replaceInitialState(serverData);
+                        else applyLiveMessage(message);
                     }
                 }
-            }
-        );
+            } catch {}
 
+            if (!isInterestingWebSocketPayload(payload)) return;
 
-        debuggerClient.on(
-            "detach",
-            (
-                _event,
-                reason
-            ) => {
+            const safePayload = redactSensitiveWebSocketData(payload);
+            const MAX_LOG_LENGTH = 20000;
+            const output = safePayload.length > MAX_LOG_LENGTH
+                ? safePayload.slice(0, MAX_LOG_LENGTH) + " ... <TRUNCATED>"
+                : safePayload;
 
-                console.log(
-                    "[Sharkord WS] debugger desconectado:",
-                    reason
-                );
-            }
-        );
+            console.log(
+                received ? "[Sharkord WS RECEIVED]" : "[Sharkord WS SENT]",
+                output
+            );
+        });
 
+        debuggerClient.on("detach", (_event, reason) => {
+            console.log("[Sharkord WS] debugger desconectado:", reason);
+        });
 
-        console.log(
-            "[Sharkord WS] logger de frames ativado."
-        );
-
+        console.log("[Sharkord WS] logger de frames ativado.");
     } catch (error) {
-
-        console.error(
-            "[Sharkord WS] erro ativando logger:",
-            error
-        );
+        console.error("[Sharkord WS] erro ativando logger:", error);
     }
 }
 

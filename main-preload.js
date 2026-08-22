@@ -221,6 +221,10 @@ contextBridge.executeInMainWorld({
             null;
 
 
+        let uiCleanupTimer =
+            null;
+
+
         let lastExplicitStopAt =
             0;
 
@@ -4210,9 +4214,67 @@ contextBridge.executeInMainWorld({
             }
 
 
+            if (
+                uiCleanupTimer
+            ) {
+
+                clearTimeout(
+                    uiCleanupTimer
+                );
+
+
+                uiCleanupTimer =
+                    null;
+            }
+
+
             removeVoicePanelSwitchButton();
 
             removeCallBarSwitchButton();
+        }
+
+
+        function scheduleDeferredSwitchButtonCleanup(
+            delayMs = 350
+        ) {
+
+            if (
+                buttonSearchTimer
+            ) {
+
+                clearTimeout(
+                    buttonSearchTimer
+                );
+
+
+                buttonSearchTimer =
+                    null;
+            }
+
+
+            if (
+                uiCleanupTimer
+            ) {
+
+                clearTimeout(
+                    uiCleanupTimer
+                );
+            }
+
+
+            uiCleanupTimer =
+                setTimeout(
+                    () => {
+
+                        uiCleanupTimer =
+                            null;
+
+
+                        removeSwitchButtons();
+
+                    },
+                    delayMs
+                );
         }
 
 
@@ -4700,7 +4762,23 @@ contextBridge.executeInMainWorld({
                         true;
 
 
-                    removeSwitchButtons();
+                    /*
+                     * v12.3 UI STOP FIX:
+                     *
+                     * Não removemos nosso botão durante o mesmo
+                     * ciclo do click nativo. O Sharkord/React está
+                     * desmontando e remontando a barra nesse exato
+                     * momento; alterar os filhos do container no meio
+                     * da reconciliação podia fazer os ícones nativos
+                     * piscarem/sumirem temporariamente.
+                     *
+                     * Cancelamos buscas pendentes e limpamos nossos
+                     * botões só depois que a UI nativa teve tempo de
+                     * estabilizar.
+                     */
+                    scheduleDeferredSwitchButtonCleanup(
+                        350
+                    );
 
 
                     if (
@@ -5181,13 +5259,19 @@ contextBridge.executeInMainWorld({
 
 
             if (
-                !session ||
-                session.stopping
+                !session
             ) {
 
                 removeSwitchButtons();
 
 
+                return false;
+            }
+
+
+            if (
+                session.stopping
+            ) {
                 return false;
             }
 
@@ -5228,13 +5312,19 @@ contextBridge.executeInMainWorld({
 
 
             if (
-                !currentSession ||
-                currentSession.stopping
+                !currentSession
             ) {
 
                 removeSwitchButtons();
 
 
+                return;
+            }
+
+
+            if (
+                currentSession.stopping
+            ) {
                 return;
             }
 
@@ -5295,13 +5385,19 @@ contextBridge.executeInMainWorld({
                     () => {
 
                         if (
-                            !currentSession ||
-                            currentSession.stopping
+                            !currentSession
                         ) {
 
                             removeSwitchButtons();
 
 
+                            return;
+                        }
+
+
+                        if (
+                            currentSession.stopping
+                        ) {
                             return;
                         }
 
@@ -5837,7 +5933,9 @@ contextBridge.executeInMainWorld({
                     );
 
 
-                    removeSwitchButtons();
+                    scheduleDeferredSwitchButtonCleanup(
+                        350
+                    );
                 }
 
             },
@@ -5853,7 +5951,7 @@ contextBridge.executeInMainWorld({
 
 
         console.log(
-            "[ScreenShare] v12.2 FAST START + AUDIO SWITCH FIX + dois botões à esquerda do PARAR + JSON Flight Recorder instalado."
+            "[ScreenShare] v12.3 UI STOP FIX + FAST START + AUDIO SWITCH FIX + dois botões à esquerda do PARAR + JSON Flight Recorder instalado."
         );
     }
 });

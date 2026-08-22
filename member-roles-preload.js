@@ -1,106 +1,81 @@
-const {
-    ipcRenderer
-} = require(
-    "electron"
-);
-
-
-// ======================================================
-// Sharkord Desktop
-// member-roles-preload.js
-//
-// v4.1
-//
-// - Usa dados reais enviados pelo main.js
-// - Agrupa membros pela role principal
-// - Corrige o primeiro membro ficando fora do grupo
-// - Colore o nome pela cor da role
-// - Não interfere no screen share / áudio / branding
-// ======================================================
+const { ipcRenderer } = require("electron");
 
 (() => {
-
     "use strict";
 
+    // ======================================================
+    // Sharkord Desktop
+    // member-roles-preload.js
+    //
+    // v4.3
+    //
+    // - Roles reais do servidor
+    // - Cores reais das roles
+    // - Atualização em tempo real
+    // - Não move membros desnecessariamente
+    // - Corrige loop infinito do MutationObserver
+    // ======================================================
 
-    // ==================================================
-    // CONSTANTES
-    // ==================================================
 
     const STYLE_ID =
-        "skr-member-roles-v41-style";
-
+        "skr-member-roles-v43-style";
 
     const HEADER_CLASS =
-        "skr-member-role-header-v41";
+        "skr-member-role-header-v43";
+
+    const FLEX_CLASS =
+        "skr-member-role-flex-v43";
+
+    const GENERATED_MARK =
+        "data-skr-role-generated-v43";
+
+    const COLORED_MARK =
+        "data-skr-role-colored-v43";
+
+    const ORDER_MARK =
+        "data-skr-role-order-v43";
+
+    const HIDDEN_MARK =
+        "data-skr-original-members-hidden-v43";
 
 
-    const ORIGINAL_HEADER_MARK =
-        "data-skr-original-members-header-v41";
-
-
-    const INSERTED_MARK =
-        "data-skr-role-header-v41";
-
-
-    const ANCHOR_MARK =
-        "data-skr-role-anchor-v41";
-
-
-    const NAME_MARK =
-        "data-skr-role-colored-name-v41";
-
-
-    // ==================================================
+    // ======================================================
     // ESTADO
-    // ==================================================
+    // ======================================================
 
-    let serverUsers =
-        [];
+    let serverUsers = [];
+    let serverRoles = [];
 
+    let renderTimer = null;
 
-    let serverRoles =
-        [];
+    let rendering = false;
 
+    let observer = null;
 
-    let renderTimer =
-        null;
+    let observerPaused = false;
 
-
-    let rendering =
-        false;
+    let lastSignature = "";
 
 
-    let lastSignature =
-        "";
-
-
-    // ==================================================
+    // ======================================================
     // LOG
-    // ==================================================
+    // ======================================================
 
-    function log(
-        ...args
-    ) {
-
+    function log(...args) {
         console.log(
-            "[Member Roles v4.1]",
+            "[Member Roles v4.3]",
             ...args
         );
     }
 
 
-    // ==================================================
+    // ======================================================
     // TEXTO
-    // ==================================================
+    // ======================================================
 
-    function normalizeText(
-        value
-    ) {
-
+    function normalizeText(value) {
         return String(
-            value ??
-            ""
+            value ?? ""
         )
             .replace(
                 /\s+/g,
@@ -110,97 +85,74 @@ const {
     }
 
 
-    function normalizeKey(
-        value
-    ) {
-
+    function normalizeKey(value) {
         return normalizeText(
             value
-        )
-            .toLowerCase();
+        ).toLowerCase();
     }
 
 
-    // ==================================================
+    // ======================================================
     // VISIBILIDADE
-    // ==================================================
+    // ======================================================
 
-    function isVisible(
-        element
-    ) {
-
+    function isVisible(element) {
         if (
             !(element instanceof HTMLElement)
         ) {
-
             return false;
         }
 
-
         const rect =
             element.getBoundingClientRect();
-
 
         if (
             rect.width <= 0 ||
             rect.height <= 0
         ) {
-
             return false;
         }
-
 
         const style =
             window.getComputedStyle(
                 element
             );
 
-
         return (
-            style.display !==
-            "none" &&
-            style.visibility !==
-            "hidden"
+            style.display !== "none" &&
+            style.visibility !== "hidden"
         );
     }
 
 
-    // ==================================================
+    // ======================================================
     // CSS
-    // ==================================================
+    // ======================================================
 
     function installStyles() {
-
         if (
-            !document.documentElement
-        ) {
-
-            return;
-        }
-
-
-        if (
+            !document.documentElement ||
             document.getElementById(
                 STYLE_ID
             )
         ) {
-
             return;
         }
-
 
         const style =
             document.createElement(
                 "style"
             );
 
-
         style.id =
             STYLE_ID;
 
+        style.textContent = `
+            .${FLEX_CLASS} {
+                display: flex !important;
+                flex-direction: column !important;
+            }
 
-        style.textContent =
-            `
             .${HEADER_CLASS} {
                 box-sizing: border-box;
 
@@ -230,12 +182,11 @@ const {
             }
 
             .${HEADER_CLASS}
-            .skr-role-count-v41 {
+            .skr-role-count-v43 {
                 margin-left: 4px;
                 opacity: .85;
             }
-            `;
-
+        `;
 
         document.documentElement
             .appendChild(
@@ -244,14 +195,62 @@ const {
     }
 
 
-    // ==================================================
-    // RECEBE DADOS DO MAIN
-    // ==================================================
+    // ======================================================
+    // OBSERVER
+    // ======================================================
 
-    function setServerData(
-        data
-    ) {
+    function connectObserver() {
+        if (
+            !observer ||
+            !document.documentElement
+        ) {
+            return;
+        }
 
+        observer.observe(
+            document.documentElement,
+            {
+                childList: true,
+                subtree: true
+            }
+        );
+    }
+
+
+    function pauseObserver() {
+        observerPaused = true;
+
+        if (
+            observer
+        ) {
+            observer.disconnect();
+        }
+    }
+
+
+    function resumeObserver() {
+        /*
+         * Esperamos o ciclo atual do DOM terminar.
+         *
+         * Assim as mutações feitas pelo nosso próprio
+         * render não voltam para o observer.
+         */
+        setTimeout(
+            () => {
+                observerPaused = false;
+
+                connectObserver();
+            },
+            0
+        );
+    }
+
+
+    // ======================================================
+    // DADOS DO SERVIDOR
+    // ======================================================
+
+    function setServerData(data) {
         if (
             !data ||
             !Array.isArray(
@@ -261,12 +260,11 @@ const {
                 data.roles
             )
         ) {
-
             return;
         }
 
 
-        serverUsers =
+        const nextUsers =
             data.users
                 .filter(
                     user =>
@@ -276,112 +274,112 @@ const {
                         "__deleted_user__"
                 )
                 .map(
-                    user => {
+                    user => ({
+                        id:
+                            Number(
+                                user.id
+                            ),
 
-                        return {
+                        name:
+                            normalizeText(
+                                user.name
+                            ),
 
-                            id:
-                                Number(
-                                    user.id
-                                ),
-
-                            name:
-                                normalizeText(
-                                    user.name
-                                ),
-
-                            roleIds:
-                                Array.isArray(
-                                    user.roleIds
+                        roleIds:
+                            Array.isArray(
+                                user.roleIds
+                            )
+                                ? user.roleIds.map(
+                                    roleId =>
+                                        Number(
+                                            roleId
+                                        )
                                 )
-                                    ? user.roleIds.map(
-                                        roleId =>
-                                            Number(
-                                                roleId
-                                            )
-                                    )
-                                    : []
-                        };
-                    }
+                                : []
+                    })
                 );
 
 
-        serverRoles =
+        const nextRoles =
             data.roles
                 .filter(
                     role =>
                         role &&
-                        role.id !==
-                        undefined
+                        role.id !== undefined
                 )
                 .map(
-                    role => {
+                    role => ({
+                        id:
+                            Number(
+                                role.id
+                            ),
 
-                        return {
+                        name:
+                            normalizeText(
+                                role.name
+                            ) ||
+                            "Role",
 
-                            id:
-                                Number(
-                                    role.id
-                                ),
+                        color:
+                            normalizeText(
+                                role.color
+                            ) ||
+                            null,
 
-                            name:
-                                normalizeText(
-                                    role.name
-                                ) ||
-                                "Role",
-
-                            color:
-                                normalizeText(
-                                    role.color
-                                ) ||
-                                null,
-
-                            isDefault:
-                                Boolean(
-                                    role.isDefault
-                                )
-                        };
-                    }
+                        isDefault:
+                            Boolean(
+                                role.isDefault
+                            )
+                    })
                 );
 
 
-        log(
-            "dados recebidos:",
-            {
+        const oldDataSignature =
+            JSON.stringify({
                 users:
-                    serverUsers.map(
-                        user => ({
-                            name:
-                            user.name,
-
-                            roleIds:
-                            user.roleIds
-                        })
-                    ),
+                serverUsers,
 
                 roles:
-                    serverRoles.map(
-                        role => ({
-                            id:
-                            role.id,
+                serverRoles
+            });
 
-                            name:
-                            role.name,
 
-                            color:
-                            role.color,
+        const newDataSignature =
+            JSON.stringify({
+                users:
+                nextUsers,
 
-                            isDefault:
-                            role.isDefault
-                        })
-                    )
-            }
+                roles:
+                nextRoles
+            });
+
+
+        /*
+         * Se o main reenviar exatamente o mesmo
+         * estado, não fazemos nada.
+         */
+        if (
+            oldDataSignature ===
+            newDataSignature
+        ) {
+            return;
+        }
+
+
+        serverUsers =
+            nextUsers;
+
+        serverRoles =
+            nextRoles;
+
+
+        log(
+            "dados do servidor atualizados."
         );
 
 
         /*
-         * Força reconstrução caso alguma role
-         * tenha mudado.
+         * Força uma reconstrução na próxima renderização.
          */
         lastSignature =
             "";
@@ -397,7 +395,6 @@ const {
             _event,
             data
         ) => {
-
             setServerData(
                 data
             );
@@ -405,26 +402,20 @@ const {
     );
 
 
-    // ==================================================
-    // ROLE POR ID
-    // ==================================================
+    // ======================================================
+    // ROLES
+    // ======================================================
 
-    function getRoleById(
-        id
-    ) {
-
+    function getRoleById(id) {
         const numericId =
             Number(
                 id
             );
 
-
         return (
             serverRoles.find(
                 role =>
-                    Number(
-                        role.id
-                    ) ===
+                    role.id ===
                     numericId
             ) ||
             null
@@ -432,21 +423,13 @@ const {
     }
 
 
-    // ==================================================
-    // ROLE PRINCIPAL
-    // ==================================================
-
-    function getPrimaryRole(
-        user
-    ) {
-
+    function getPrimaryRole(user) {
         if (
             !user ||
             !Array.isArray(
                 user.roleIds
             )
         ) {
-
             return null;
         }
 
@@ -467,31 +450,19 @@ const {
         if (
             !assignedRoles.length
         ) {
-
             return null;
         }
 
 
-        /*
-         * Role não-default vence role default.
-         *
-         * Exemplo:
-         *
-         * Owner + Member
-         * =>
-         * Owner
-         */
         assignedRoles.sort(
             (
                 roleA,
                 roleB
             ) => {
-
                 const defaultA =
                     Boolean(
                         roleA?.isDefault
                     );
-
 
                 const defaultB =
                     Boolean(
@@ -499,11 +470,17 @@ const {
                     );
 
 
+                /*
+                 * Cargo não-default ganha do default.
+                 *
+                 * Owner + Member
+                 * =>
+                 * Owner
+                 */
                 if (
                     defaultA !==
                     defaultB
                 ) {
-
                     return (
                         Number(
                             defaultA
@@ -515,23 +492,15 @@ const {
                 }
 
 
-                const idA =
+                return (
                     Number(
                         roleA?.id ??
                         0
-                    );
-
-
-                const idB =
+                    ) -
                     Number(
                         roleB?.id ??
                         0
-                    );
-
-
-                return (
-                    idA -
-                    idB
+                    )
                 );
             }
         );
@@ -541,14 +510,11 @@ const {
     }
 
 
-    // ==================================================
-    // PROCURA NOME NA SIDEBAR
-    // ==================================================
+    // ======================================================
+    // ELEMENTO DO NOME
+    // ======================================================
 
-    function findExactNameElement(
-        name
-    ) {
-
+    function findExactNameElement(name) {
         const wanted =
             normalizeKey(
                 name
@@ -563,13 +529,11 @@ const {
             )
                 .filter(
                     element => {
-
                         if (
                             !isVisible(
                                 element
                             )
                         ) {
-
                             return false;
                         }
 
@@ -580,15 +544,14 @@ const {
 
 
                         /*
-                         * Sidebar de membros fica
-                         * na direita.
+                         * Lista de membros fica na
+                         * lateral direita.
                          */
                         if (
                             rect.left <
                             window.innerWidth *
                             0.60
                         ) {
-
                             return false;
                         }
 
@@ -604,21 +567,17 @@ const {
 
 
         /*
-         * Escolhe o menor elemento que contém
+         * Preferimos o menor elemento que contém
          * exatamente o nome.
-         *
-         * Isso evita escolher um wrapper enorme.
          */
         candidates.sort(
             (
                 elementA,
                 elementB
             ) => {
-
                 const rectA =
                     elementA
                         .getBoundingClientRect();
-
 
                 const rectB =
                     elementB
@@ -644,25 +603,22 @@ const {
     }
 
 
-    // ==================================================
-    // DESCOBRE A ROW DO MEMBRO
-    // ==================================================
+    // ======================================================
+    // ROW DO MEMBRO
+    // ======================================================
 
     function findMemberRow(
         nameElement
     ) {
-
         if (
             !nameElement
         ) {
-
             return null;
         }
 
 
         let current =
             nameElement;
-
 
         let best =
             null;
@@ -676,26 +632,20 @@ const {
 
             depth++
         ) {
-
             const rect =
                 current
                     .getBoundingClientRect();
 
 
             if (
-                rect.width >=
-                140 &&
-                rect.width <=
-                420 &&
-                rect.height >=
-                28 &&
-                rect.height <=
-                72 &&
+                rect.width >= 140 &&
+                rect.width <= 420 &&
+                rect.height >= 28 &&
+                rect.height <= 72 &&
                 rect.left >
                 window.innerWidth *
                 0.55
             ) {
-
                 best =
                     current;
             }
@@ -710,17 +660,12 @@ const {
     }
 
 
-    // ==================================================
+    // ======================================================
     // ANCESTRAIS
-    // ==================================================
+    // ======================================================
 
-    function getAncestors(
-        element
-    ) {
-
-        const result =
-            [];
-
+    function getAncestors(element) {
+        const result = [];
 
         let current =
             element;
@@ -729,11 +674,9 @@ const {
         while (
             current
             ) {
-
             result.push(
                 current
             );
-
 
             current =
                 current.parentElement;
@@ -747,11 +690,9 @@ const {
     function findCommonAncestor(
         elements
     ) {
-
         if (
             !elements.length
         ) {
-
             return null;
         }
 
@@ -766,7 +707,6 @@ const {
             const candidate
             of firstAncestors
             ) {
-
             if (
                 elements.every(
                     element =>
@@ -775,7 +715,6 @@ const {
                         )
                 )
             ) {
-
                 return candidate;
             }
         }
@@ -785,20 +724,14 @@ const {
     }
 
 
-    // ==================================================
-    // FILHO DIRETO
-    // ==================================================
-
     function getDirectChildUnder(
         ancestor,
         element
     ) {
-
         if (
             !ancestor ||
             !element
         ) {
-
             return null;
         }
 
@@ -812,7 +745,6 @@ const {
             current.parentElement !==
             ancestor
             ) {
-
             current =
                 current.parentElement;
         }
@@ -823,7 +755,6 @@ const {
             current.parentElement ===
             ancestor
         ) {
-
             return current;
         }
 
@@ -832,20 +763,16 @@ const {
     }
 
 
-    // ==================================================
+    // ======================================================
     // HEADER ORIGINAL "MEMBERS — X"
-    // ==================================================
+    // ======================================================
 
     function findOriginalMembersHeader(
-        commonParent,
         firstRow
     ) {
-
         if (
-            !commonParent ||
             !firstRow
         ) {
-
             return null;
         }
 
@@ -857,19 +784,26 @@ const {
 
         const candidates =
             Array.from(
-                commonParent.querySelectorAll(
-                    "span, p, div"
+                document.querySelectorAll(
+                    "span, p, div, h1, h2, h3, h4"
                 )
             )
                 .filter(
                     element => {
+                        if (
+                            element.hasAttribute(
+                                GENERATED_MARK
+                            )
+                        ) {
+                            return false;
+                        }
+
 
                         if (
                             !isVisible(
                                 element
                             )
                         ) {
-
                             return false;
                         }
 
@@ -880,14 +814,11 @@ const {
                             );
 
 
-                        const membersMatch =
+                        const matches =
                             /^members?\s*[—–:-]?\s*\d*$/
                                 .test(
                                     text
-                                );
-
-
-                        const membrosMatch =
+                                ) ||
                             /^membros?\s*[—–:-]?\s*\d*$/
                                 .test(
                                     text
@@ -895,10 +826,8 @@ const {
 
 
                         if (
-                            !membersMatch &&
-                            !membrosMatch
+                            !matches
                         ) {
-
                             return false;
                         }
 
@@ -909,30 +838,39 @@ const {
 
 
                         return (
+                            rect.left >
+                            window.innerWidth *
+                            0.55 &&
+
                             rect.bottom <=
                             rowRect.top +
-                            6
+                            8 &&
+
+                            rowRect.top -
+                            rect.bottom <
+                            120
                         );
                     }
                 );
 
 
-        /*
-         * Mais próximo da primeira row.
-         */
         candidates.sort(
             (
                 elementA,
                 elementB
             ) => {
+                const rectA =
+                    elementA
+                        .getBoundingClientRect();
+
+                const rectB =
+                    elementB
+                        .getBoundingClientRect();
+
 
                 return (
-                    elementB
-                        .getBoundingClientRect()
-                        .top -
-                    elementA
-                        .getBoundingClientRect()
-                        .top
+                    rectB.bottom -
+                    rectA.bottom
                 );
             }
         );
@@ -945,202 +883,123 @@ const {
     }
 
 
-    // ==================================================
-    // RESTAURA CORES ANTIGAS
-    // ==================================================
+    // ======================================================
+    // LIMPEZA
+    // ======================================================
 
-    function restoreMemberNameColors() {
+    function restoreGeneratedUi() {
 
-        const elements =
-            document.querySelectorAll(
-                `[${NAME_MARK}="1"]`
-            );
-
-
-        for (
-            const element
-            of elements
-            ) {
-
-            const oldColor =
-                element.dataset
-                    .skrOldRoleColorV41 ??
-                "";
-
-
-            element.style.color =
-                oldColor;
-
-
-            delete element.dataset
-                .skrOldRoleColorV41;
-
-
-            element.removeAttribute(
-                NAME_MARK
-            );
-        }
-    }
-
-
-    // ==================================================
-    // REMOVE HEADERS CRIADOS
-    // ==================================================
-
-    function removeInsertedHeaders() {
-
-        const headers =
-            document.querySelectorAll(
-                `[${INSERTED_MARK}="1"]`
-            );
-
-
-        for (
-            const header
-            of headers
-            ) {
-
-            header.remove();
-        }
-
-
-        const anchors =
-            document.querySelectorAll(
-                `[${ANCHOR_MARK}="1"]`
-            );
-
-
-        for (
-            const anchor
-            of anchors
-            ) {
-
-            anchor.remove();
-        }
-
-
-        const originals =
-            document.querySelectorAll(
-                `[${ORIGINAL_HEADER_MARK}="1"]`
-            );
-
-
-        for (
-            const header
-            of originals
-            ) {
-
-            header.style.display =
-                header.dataset
-                    .skrOldDisplayV41 ||
-                "";
-
-
-            delete header.dataset
-                .skrOldDisplayV41;
-
-
-            header.removeAttribute(
-                ORIGINAL_HEADER_MARK
-            );
-        }
-    }
-
-
-    // ==================================================
-    // CRIA HEADER DE ROLE
-    // ==================================================
-
-    function createRoleHeader(
-        role,
-        count
-    ) {
-
-        const header =
-            document.createElement(
-                "div"
-            );
-
-
-        header.className =
-            HEADER_CLASS;
-
-
-        header.setAttribute(
-            INSERTED_MARK,
-            "1"
-        );
-
-
-        /*
-         * A própria cor configurada no Sharkord.
-         */
-        if (
-            role.color
-        ) {
-
-            header.style.color =
-                role.color;
-        }
-
-
-        const name =
-            document.createElement(
-                "span"
-            );
-
-
-        name.textContent =
-            normalizeText(
-                role.name
+        document
+            .querySelectorAll(
+                `[${GENERATED_MARK}="1"]`
             )
-                .toUpperCase();
-
-
-        const total =
-            document.createElement(
-                "span"
+            .forEach(
+                element =>
+                    element.remove()
             );
 
 
-        total.className =
-            "skr-role-count-v41";
+        document
+            .querySelectorAll(
+                `[${COLORED_MARK}="1"]`
+            )
+            .forEach(
+                element => {
+
+                    element.style.color =
+                        element.dataset
+                            .skrOldRoleColorV43 ||
+                        "";
 
 
-        total.textContent =
-            `— ${count}`;
+                    delete element.dataset
+                        .skrOldRoleColorV43;
 
 
-        header.appendChild(
-            name
-        );
+                    element.removeAttribute(
+                        COLORED_MARK
+                    );
+                }
+            );
 
 
-        header.appendChild(
-            total
-        );
+        document
+            .querySelectorAll(
+                `[${ORDER_MARK}="1"]`
+            )
+            .forEach(
+                element => {
+
+                    element.style.order =
+                        element.dataset
+                            .skrOldRoleOrderV43 ||
+                        "";
 
 
-        return header;
+                    delete element.dataset
+                        .skrOldRoleOrderV43;
+
+
+                    element.removeAttribute(
+                        ORDER_MARK
+                    );
+                }
+            );
+
+
+        document
+            .querySelectorAll(
+                `[${HIDDEN_MARK}="1"]`
+            )
+            .forEach(
+                element => {
+
+                    element.style.display =
+                        element.dataset
+                            .skrOldDisplayV43 ||
+                        "";
+
+
+                    delete element.dataset
+                        .skrOldDisplayV43;
+
+
+                    element.removeAttribute(
+                        HIDDEN_MARK
+                    );
+                }
+            );
+
+
+        document
+            .querySelectorAll(
+                `.${FLEX_CLASS}`
+            )
+            .forEach(
+                element => {
+
+                    element.classList.remove(
+                        FLEX_CLASS
+                    );
+                }
+            );
     }
 
 
-    // ==================================================
-    // COLORE O NOME DO USUÁRIO
-    // ==================================================
+    // ======================================================
+    // COR DO NOME
+    // ======================================================
 
     function paintMemberName(
         row,
         user,
         role
     ) {
-
         if (
             !row ||
             !user ||
             !role?.color
         ) {
-
             return;
         }
 
@@ -1158,22 +1017,14 @@ const {
                 )
             )
                 .filter(
-                    element => {
-
-                        return (
-                            normalizeKey(
-                                element.textContent
-                            ) ===
-                            wanted
-                        );
-                    }
+                    element =>
+                        normalizeKey(
+                            element.textContent
+                        ) ===
+                        wanted
                 );
 
 
-        /*
-         * Queremos o menor elemento textual,
-         * não a row inteira.
-         */
         candidates.sort(
             (
                 elementA,
@@ -1183,7 +1034,6 @@ const {
                 const rectA =
                     elementA
                         .getBoundingClientRect();
-
 
                 const rectB =
                     elementB
@@ -1209,54 +1059,173 @@ const {
         if (
             !nameElement
         ) {
-
             return;
         }
 
 
         if (
             !nameElement.hasAttribute(
-                NAME_MARK
+                COLORED_MARK
             )
         ) {
 
             nameElement.dataset
-                .skrOldRoleColorV41 =
+                .skrOldRoleColorV43 =
                 nameElement.style.color ||
                 "";
 
 
             nameElement.setAttribute(
-                NAME_MARK,
+                COLORED_MARK,
                 "1"
             );
         }
 
 
-        nameElement.style.color =
-            role.color;
+        if (
+            nameElement.style.color !==
+            role.color
+        ) {
+            nameElement.style.color =
+                role.color;
+        }
     }
 
 
-    // ==================================================
+    // ======================================================
+    // CRIAR HEADER
+    // ======================================================
+
+    function createRoleHeader(
+        role,
+        count,
+        order
+    ) {
+
+        const header =
+            document.createElement(
+                "div"
+            );
+
+
+        header.className =
+            HEADER_CLASS;
+
+
+        header.setAttribute(
+            GENERATED_MARK,
+            "1"
+        );
+
+
+        header.style.order =
+            String(
+                order
+            );
+
+
+        if (
+            role.color
+        ) {
+            header.style.color =
+                role.color;
+        }
+
+
+        const name =
+            document.createElement(
+                "span"
+            );
+
+
+        name.textContent =
+            normalizeText(
+                role.name
+            ).toUpperCase();
+
+
+        const total =
+            document.createElement(
+                "span"
+            );
+
+
+        total.className =
+            "skr-role-count-v43";
+
+
+        total.textContent =
+            `— ${count}`;
+
+
+        header.appendChild(
+            name
+        );
+
+
+        header.appendChild(
+            total
+        );
+
+
+        return header;
+    }
+
+
+    // ======================================================
+    // VALIDA UI EXISTENTE
+    // ======================================================
+
+    function isCurrentUiStillValid(
+        mapped
+    ) {
+
+        const headers =
+            document.querySelectorAll(
+                `[${GENERATED_MARK}="1"]`
+            );
+
+
+        if (
+            headers.length ===
+            0
+        ) {
+            return false;
+        }
+
+
+        for (
+            const item
+            of mapped
+            ) {
+
+            if (
+                !item.row ||
+                !item.row.isConnected ||
+                !item.row.hasAttribute(
+                    ORDER_MARK
+                )
+            ) {
+                return false;
+            }
+        }
+
+
+        return true;
+    }
+
+
+    // ======================================================
     // RENDER
-    // ==================================================
+    // ======================================================
 
     function render() {
 
         if (
-            rendering
-        ) {
-
-            return;
-        }
-
-
-        if (
+            rendering ||
             !document.documentElement ||
             !document.body
         ) {
-
             return;
         }
 
@@ -1265,7 +1234,6 @@ const {
             !serverUsers.length ||
             !serverRoles.length
         ) {
-
             return;
         }
 
@@ -1279,9 +1247,9 @@ const {
             installStyles();
 
 
-            // ==========================================
-            // MAPEIA USUÁRIOS PARA ELEMENTOS
-            // ==========================================
+            // ==================================================
+            // MAPEIA USUÁRIOS
+            // ==================================================
 
             const mapped =
                 [];
@@ -1301,7 +1269,6 @@ const {
                 if (
                     !nameElement
                 ) {
-
                     continue;
                 }
 
@@ -1315,13 +1282,11 @@ const {
                 if (
                     !row
                 ) {
-
                     continue;
                 }
 
 
                 mapped.push({
-
                     user,
 
                     role:
@@ -1329,9 +1294,7 @@ const {
                             user
                         ),
 
-                    row,
-
-                    nameElement
+                    row
                 });
             }
 
@@ -1340,23 +1303,13 @@ const {
                 mapped.length <
                 2
             ) {
-
-                log(
-                    "ainda não achei linhas suficientes:",
-                    mapped.map(
-                        item =>
-                            item.user.name
-                    )
-                );
-
-
                 return;
             }
 
 
-            // ==========================================
-            // CONTAINER COMUM
-            // ==========================================
+            // ==================================================
+            // CONTAINER
+            // ==================================================
 
             const commonAncestor =
                 findCommonAncestor(
@@ -1370,36 +1323,22 @@ const {
             if (
                 !commonAncestor
             ) {
-
-                log(
-                    "ancestral comum não encontrado."
-                );
-
-
                 return;
             }
 
 
-            // ==========================================
-            // TRANSFORMA EM FILHOS DIRETOS
-            // ==========================================
-
             const directMapped =
                 mapped
                     .map(
-                        item => {
+                        item => ({
+                            ...item,
 
-                            return {
-
-                                ...item,
-
-                                row:
-                                    getDirectChildUnder(
-                                        commonAncestor,
-                                        item.row
-                                    )
-                            };
-                        }
+                            row:
+                                getDirectChildUnder(
+                                    commonAncestor,
+                                    item.row
+                                )
+                        })
                     )
                     .filter(
                         item =>
@@ -1420,29 +1359,30 @@ const {
                 uniqueRows.size !==
                 directMapped.length
             ) {
-
-                log(
-                    "wrappers duplicados encontrados; aguardando layout estabilizar."
-                );
-
-
                 return;
             }
 
 
-            // ==========================================
-            // ASSINATURA
-            // ==========================================
+            // ==================================================
+            // ASSINATURA DO ESTADO
+            // ==================================================
 
             const signature =
                 directMapped
                     .map(
                         item => {
 
-                            return (
-                                `${item.user.id}:` +
-                                `${item.role?.id ?? "none"}:` +
-                                `${item.role?.color ?? ""}`
+                            return [
+                                item.user.id,
+                                item.user.name,
+                                item.role?.id ??
+                                "none",
+                                item.role?.name ??
+                                "",
+                                item.role?.color ??
+                                ""
+                            ].join(
+                                ":"
                             );
                         }
                     )
@@ -1452,18 +1392,23 @@ const {
                     );
 
 
+            /*
+             * Nada mudou.
+             *
+             * Não desmontamos tudo de novo.
+             */
             if (
                 signature ===
                 lastSignature &&
-                document.querySelector(
-                    `[${INSERTED_MARK}="1"]`
+                isCurrentUiStillValid(
+                    directMapped
                 )
             ) {
 
                 /*
-                 * Mesmo assim repinta os nomes,
-                 * porque o React pode ter recriado
-                 * algum span.
+                 * Só garante as cores.
+                 *
+                 * Isso é barato e não altera childList.
                  */
                 for (
                     const item
@@ -1473,7 +1418,6 @@ const {
                     if (
                         item.role
                     ) {
-
                         paintMemberName(
                             item.row,
                             item.user,
@@ -1487,23 +1431,93 @@ const {
             }
 
 
-            // ==========================================
-            // LIMPA UI ANTERIOR
-            // ==========================================
+            // ==================================================
+            // A PARTIR DAQUI VAMOS ALTERAR DOM
+            // ==================================================
 
-            removeInsertedHeaders();
-
-
-            restoreMemberNameColors();
+            pauseObserver();
 
 
-            lastSignature =
-                signature;
+            restoreGeneratedUi();
 
 
-            // ==========================================
-            // AGRUPA POR ROLE
-            // ==========================================
+            // ==================================================
+            // ORDEM VISUAL ORIGINAL
+            // ==================================================
+
+            directMapped.sort(
+                (
+                    itemA,
+                    itemB
+                ) => {
+
+                    return (
+                        itemA.row
+                            .getBoundingClientRect()
+                            .top -
+                        itemB.row
+                            .getBoundingClientRect()
+                            .top
+                    );
+                }
+            );
+
+
+            const firstVisualRow =
+                directMapped[0]
+                    ?.row;
+
+
+            if (
+                !firstVisualRow
+            ) {
+                return;
+            }
+
+
+            // ==================================================
+            // ESCONDE HEADER ORIGINAL
+            // ==================================================
+
+            const originalHeader =
+                findOriginalMembersHeader(
+                    firstVisualRow
+                );
+
+
+            if (
+                originalHeader
+            ) {
+
+                originalHeader.dataset
+                    .skrOldDisplayV43 =
+                    originalHeader.style.display ||
+                    "";
+
+
+                originalHeader.setAttribute(
+                    HIDDEN_MARK,
+                    "1"
+                );
+
+
+                originalHeader.style.display =
+                    "none";
+            }
+
+
+            // ==================================================
+            // FLEX
+            // ==================================================
+
+            commonAncestor.classList.add(
+                FLEX_CLASS
+            );
+
+
+            // ==================================================
+            // AGRUPA
+            // ==================================================
 
             const groups =
                 new Map();
@@ -1517,38 +1531,24 @@ const {
                 const role =
                     item.role ||
                     {
-                        id:
-                            -1,
-
-                        name:
-                            "Members",
-
-                        color:
-                            "#FFFFFF",
-
-                        isDefault:
-                            true
+                        id: -1,
+                        name: "Members",
+                        color: "#FFFFFF",
+                        isDefault: true
                     };
-
-
-                const key =
-                    Number(
-                        role.id
-                    );
 
 
                 if (
                     !groups.has(
-                        key
+                        role.id
                     )
                 ) {
 
                     groups.set(
-                        key,
+                        role.id,
                         {
                             role,
-                            items:
-                                []
+                            items: []
                         }
                     );
                 }
@@ -1556,7 +1556,7 @@ const {
 
                 groups
                     .get(
-                        key
+                        role.id
                     )
                     .items
                     .push(
@@ -1565,9 +1565,9 @@ const {
             }
 
 
-            // ==========================================
-            // ORDEM DOS GRUPOS
-            // ==========================================
+            // ==================================================
+            // ORDEM DOS CARGOS
+            // ==================================================
 
             const orderedGroups =
                 Array.from(
@@ -1580,37 +1580,27 @@ const {
                         ) => {
 
                             const roleA =
-                                groupA.role ||
-                                {};
-
+                                groupA.role;
 
                             const roleB =
-                                groupB.role ||
-                                {};
+                                groupB.role;
 
 
                             const defaultA =
                                 Boolean(
-                                    roleA.isDefault
+                                    roleA?.isDefault
                                 );
-
 
                             const defaultB =
                                 Boolean(
-                                    roleB.isDefault
+                                    roleB?.isDefault
                                 );
 
 
-                            /*
-                             * Não-default primeiro.
-                             *
-                             * Owner antes de Member.
-                             */
                             if (
                                 defaultA !==
                                 defaultB
                             ) {
-
                                 return (
                                     Number(
                                         defaultA
@@ -1624,11 +1614,11 @@ const {
 
                             return (
                                 Number(
-                                    roleA.id ??
+                                    roleA?.id ??
                                     0
                                 ) -
                                 Number(
-                                    roleB.id ??
+                                    roleB?.id ??
                                     0
                                 )
                             );
@@ -1636,141 +1626,35 @@ const {
                     );
 
 
-            // ==========================================
-            // PRIMEIRA ROW VISUAL
-            // ==========================================
+            // ==================================================
+            // APLICA ORDERS
+            // ==================================================
 
-            const firstVisualRow =
-                directMapped
-                    .map(
-                        item =>
-                            item.row
-                    )
-                    .sort(
-                        (
-                            rowA,
-                            rowB
-                        ) => {
+            let order =
+                10;
 
-                            return (
-                                rowA
-                                    .getBoundingClientRect()
-                                    .top -
-                                rowB
-                                    .getBoundingClientRect()
-                                    .top
-                            );
-                        }
-                    )[0];
-
-
-            if (
-                !firstVisualRow
-            ) {
-
-                return;
-            }
-
-
-            // ==========================================
-            // ESCONDE "MEMBERS — X"
-            // ==========================================
-
-            const originalHeader =
-                findOriginalMembersHeader(
-                    commonAncestor,
-                    firstVisualRow
-                );
-
-
-            if (
-                originalHeader
-            ) {
-
-                originalHeader.dataset
-                    .skrOldDisplayV41 =
-                    originalHeader.style.display ||
-                    "";
-
-
-                originalHeader.setAttribute(
-                    ORIGINAL_HEADER_MARK,
-                    "1"
-                );
-
-
-                originalHeader.style.display =
-                    "none";
-            }
-
-
-            // ==========================================
-            // ÂNCORA FIXA
-            // ==========================================
-
-            /*
-             * ESTE É O FIX PRINCIPAL DA v4.1.
-             *
-             * Antes usamos a primeira row como
-             * insertionPoint.
-             *
-             * Se Erebaran fosse essa primeira row,
-             * acabávamos fazendo:
-             *
-             * insertBefore(Erebaran, Erebaran)
-             *
-             * ...que obviamente não move nada.
-             *
-             * Agora criamos uma âncora separada.
-             */
-
-            const anchor =
-                document.createElement(
-                    "div"
-                );
-
-
-            anchor.setAttribute(
-                ANCHOR_MARK,
-                "1"
-            );
-
-
-            anchor.style.display =
-                "none";
-
-
-            commonAncestor.insertBefore(
-                anchor,
-                firstVisualRow
-            );
-
-
-            // ==========================================
-            // INSERE GRUPOS
-            // ==========================================
 
             for (
                 const group
                 of orderedGroups
                 ) {
 
-                const header =
+                const roleHeader =
                     createRoleHeader(
                         group.role,
-                        group.items.length
+                        group.items.length,
+                        order++
                     );
 
 
-                commonAncestor.insertBefore(
-                    header,
-                    anchor
+                commonAncestor.appendChild(
+                    roleHeader
                 );
 
 
                 /*
-                 * Mantém a ordem visual original
-                 * dos membros dentro da própria role.
+                 * Mantém a ordem visual dos membros
+                 * dentro do cargo.
                  */
                 group.items.sort(
                     (
@@ -1795,15 +1679,30 @@ const {
                     of group.items
                     ) {
 
-                    commonAncestor.insertBefore(
-                        item.row,
-                        anchor
-                    );
+                    if (
+                        !item.row.hasAttribute(
+                            ORDER_MARK
+                        )
+                    ) {
+
+                        item.row.dataset
+                            .skrOldRoleOrderV43 =
+                            item.row.style.order ||
+                            "";
 
 
-                    // ==================================
-                    // COR DO NOME
-                    // ==================================
+                        item.row.setAttribute(
+                            ORDER_MARK,
+                            "1"
+                        );
+                    }
+
+
+                    item.row.style.order =
+                        String(
+                            order++
+                        );
+
 
                     paintMemberName(
                         item.row,
@@ -1811,30 +1710,26 @@ const {
                         group.role
                     );
                 }
+
+
+                order +=
+                    10;
             }
 
 
-            // ==========================================
-            // REMOVE ÂNCORA
-            // ==========================================
-
-            anchor.remove();
+            lastSignature =
+                signature;
 
 
-            // ==========================================
-            // LOG FINAL
-            // ==========================================
-
+            /*
+             * Agora logamos UMA VEZ por mudança real.
+             */
             log(
-                "agrupamento aplicado:",
+                "agrupamento atualizado:",
                 orderedGroups.map(
                     group => ({
-
                         role:
                         group.role.name,
-
-                        color:
-                        group.role.color,
 
                         users:
                             group.items.map(
@@ -1845,16 +1740,24 @@ const {
                 )
             );
 
+
         } catch (
             error
             ) {
 
             console.error(
-                "[Member Roles v4.1] erro:",
+                "[Member Roles v4.3] erro:",
                 error
             );
 
         } finally {
+
+            if (
+                observerPaused
+            ) {
+                resumeObserver();
+            }
+
 
             rendering =
                 false;
@@ -1862,9 +1765,9 @@ const {
     }
 
 
-    // ==================================================
-    // SCHEDULER
-    // ==================================================
+    // ======================================================
+    // AGENDADOR
+    // ======================================================
 
     function scheduleRender() {
 
@@ -1881,9 +1784,9 @@ const {
     }
 
 
-    // ==================================================
-    // DOM OBSERVER
-    // ==================================================
+    // ======================================================
+    // INICIA OBSERVER
+    // ======================================================
 
     function startDomObserver() {
 
@@ -1896,7 +1799,6 @@ const {
                 25
             );
 
-
             return;
         }
 
@@ -1904,25 +1806,49 @@ const {
         installStyles();
 
 
-        const observer =
+        observer =
             new MutationObserver(
-                () => {
+                mutations => {
+
+                    if (
+                        observerPaused ||
+                        rendering
+                    ) {
+                        return;
+                    }
+
+
+                    /*
+                     * Só interessa se realmente houve
+                     * alteração estrutural.
+                     */
+                    const hasRelevantChange =
+                        mutations.some(
+                            mutation =>
+                                mutation.type ===
+                                "childList" &&
+                                (
+                                    mutation.addedNodes.length >
+                                    0 ||
+                                    mutation.removedNodes.length >
+                                    0
+                                )
+                        );
+
+
+                    if (
+                        !hasRelevantChange
+                    ) {
+                        return;
+                    }
+
 
                     scheduleRender();
                 }
             );
 
 
-        observer.observe(
-            document.documentElement,
-            {
-                childList:
-                    true,
-
-                subtree:
-                    true
-            }
-        );
+        connectObserver();
 
 
         window.addEventListener(
@@ -1935,14 +1861,14 @@ const {
 
 
         log(
-            "v4.1 iniciado."
+            "v4.3 iniciado."
         );
     }
 
 
-    // ==================================================
+    // ======================================================
     // START
-    // ==================================================
+    // ======================================================
 
     if (
         document.documentElement
@@ -1956,8 +1882,7 @@ const {
             "DOMContentLoaded",
             startDomObserver,
             {
-                once:
-                    true
+                once: true
             }
         );
     }
