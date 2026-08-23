@@ -22,84 +22,143 @@ function installScreenShareUi(
         const code = String.raw`
 (() => {
 
+    const PATCH_FLAG =
+        "__sharkordScreenSwitchButtonStateV2";
+
+
     if (
-        window.__sharkordScreenSwitchV6
+        window[
+            PATCH_FLAG
+        ]
     ) {
         return;
     }
 
 
-    window.__sharkordScreenSwitchV6 =
+    window[
+        PATCH_FLAG
+    ] =
         true;
 
 
     const VOICE_BUTTON_ID =
-        "__sharkord_switch_voice_v6";
+        "__sharkord_switch_voice_state_v2";
 
 
     const CALL_BUTTON_ID =
-        "__sharkord_switch_call_v6";
+        "__sharkord_switch_call_state_v2";
 
 
-    /*
-     * Remove resíduos de versões anteriores caso o renderer
-     * tenha sido recarregado sem encerrar o processo inteiro.
-     */
-    document
-        .getElementById(
-            "__sharkord_switch_voice_v3"
-        )
-        ?.remove();
-
-
-    document
-        .getElementById(
-            "__sharkord_switch_call_v3"
-        )
-        ?.remove();
-
-
-    document
-        .getElementById(
-            "__sharkord_switch_voice_v4"
-        )
-        ?.remove();
-
-
-    document
-        .getElementById(
-            "__sharkord_switch_call_v4"
-        )
-        ?.remove();
-
-
-    document
-        .getElementById(
-            "__sharkord_switch_voice_v5"
-        )
-        ?.remove();
-
-
-    document
-        .getElementById(
-            "__sharkord_switch_call_v5"
-        )
-        ?.remove();
+    const LEGACY_IDS = [
+        "__sharkord_voice_panel_switch_button",
+        "__sharkord_call_bar_switch_button",
+        "__sharkord_switch_voice_stable_v1",
+        "__sharkord_switch_call_stable_v1",
+        "__sharkord_switch_voice_v3",
+        "__sharkord_switch_call_v3",
+        "__sharkord_switch_voice_v4",
+        "__sharkord_switch_call_v4",
+        "__sharkord_switch_voice_v5",
+        "__sharkord_switch_call_v5",
+        "__sharkord_switch_voice_v6",
+        "__sharkord_switch_call_v6",
+        "__sharkord_switch_voice_v7",
+        "__sharkord_switch_call_v7",
+        "__sharkord_simple_switch_source",
+        "__sharkord_switch_voice_clean_v1",
+        "__sharkord_switch_call_clean_v1"
+    ];
 
 
     const SWITCH_ICON =
         '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">' +
-        '<rect x="2.75" y="4" width="12.5" height="9.25" rx="1.6" stroke="currentColor" stroke-width="1.8"/>' +
-        '<path d="M6.5 16H11.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>' +
-        '<path d="M9 13.5V16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>' +
-        '<rect x="10.25" y="10.25" width="11" height="8.25" rx="1.5" fill="currentColor" fill-opacity="0.08" stroke="currentColor" stroke-width="1.8"/>' +
-        '<path d="M13 14.35H18.1" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>' +
-        '<path d="M16.2 12.45L18.35 14.35L16.2 16.25" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>' +
-        '</svg>;
+        '<rect x="3" y="4" width="18" height="13" rx="2" stroke="currentColor" stroke-width="1.8"/>' +
+        '<path d="M8.5 20H15.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>' +
+        '<path d="M12 17V20" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>' +
+        '<path d="M12.5 12.5L17.5 7.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>' +
+        '<path d="M14 7.5H17.5V11" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>' +
+        '</svg>';
 
 
     let switching =
         false;
+
+
+    let refreshTimer =
+        null;
+
+
+    let lastKnownSharing =
+        null;
+
+
+    let missingCallSince =
+        0;
+
+
+    const SHARE_STATE_EVENT =
+        "__sharkordLocalScreenShareState";
+
+
+    function getLocalSharingState() {
+
+        return (
+            window
+                .__sharkordLocalScreenShareActive ===
+            true
+        );
+    }
+
+
+    function setLocalSharingState(
+        active,
+        reason =
+            "renderer"
+    ) {
+
+        const value =
+            Boolean(
+                active
+            );
+
+
+        if (
+            window
+                .__sharkordLocalScreenShareActive ===
+            value
+        ) {
+            return;
+        }
+
+
+        window
+            .__sharkordLocalScreenShareActive =
+            value;
+
+
+        console.log(
+            "[ScreenShare Button V2] estado local:",
+            {
+                active:
+                    value,
+                reason
+            }
+        );
+
+
+        window.dispatchEvent(
+            new CustomEvent(
+                SHARE_STATE_EVENT,
+                {
+                    detail: {
+                        active:
+                            value,
+                        reason
+                    }
+                }
+            )
+        );
+    }
 
 
     function delay(
@@ -121,7 +180,8 @@ function installScreenShareUi(
     ) {
 
         return String(
-            value || ""
+            value ||
+            ""
         )
             .toLowerCase()
             .normalize(
@@ -139,22 +199,6 @@ function installScreenShareUi(
     }
 
 
-    function isOurButton(
-        element
-    ) {
-
-        return Boolean(
-            element &&
-            (
-                element.id ===
-                VOICE_BUTTON_ID ||
-                element.id ===
-                CALL_BUTTON_ID
-            )
-        );
-    }
-
-
     function isVisible(
         element
     ) {
@@ -165,12 +209,15 @@ function installScreenShareUi(
 
 
         const rect =
-            element.getBoundingClientRect();
+            element
+                .getBoundingClientRect();
 
 
         if (
-            rect.width <= 0 ||
-            rect.height <= 0
+            rect.width <=
+            0 ||
+            rect.height <=
+            0
         ) {
             return false;
         }
@@ -187,7 +234,10 @@ function installScreenShareUi(
             "none" &&
             style.visibility !==
             "hidden" &&
-            Number(style.opacity || 1) >
+            Number(
+                style.opacity ||
+                1
+            ) >
             0
         );
     }
@@ -204,7 +254,6 @@ function installScreenShareUi(
 
         return normalizeText(
             [
-                element.textContent,
                 element.getAttribute?.(
                     "aria-label"
                 ),
@@ -213,7 +262,8 @@ function installScreenShareUi(
                 ),
                 element.getAttribute?.(
                     "data-tooltip-content"
-                )
+                ),
+                element.textContent
             ]
                 .filter(Boolean)
                 .join(" ")
@@ -221,39 +271,84 @@ function installScreenShareUi(
     }
 
 
-    function getBackgroundRgb(
+    function isOurButton(
+        element
+    ) {
+
+        if (!element) {
+            return false;
+        }
+
+
+        const id =
+            String(
+                element.id ||
+                ""
+            );
+
+
+        return (
+            id ===
+            VOICE_BUTTON_ID ||
+            id ===
+            CALL_BUTTON_ID ||
+            id.startsWith(
+                "__sharkord_switch_"
+            ) ||
+            id ===
+            "__sharkord_voice_panel_switch_button" ||
+            id ===
+            "__sharkord_call_bar_switch_button"
+        );
+    }
+
+
+    function parseRgb(
+        value
+    ) {
+
+        const match =
+            String(
+                value ||
+                ""
+            ).match(
+                /rgba?\(\s*(\d+)[,\s]+(\d+)[,\s]+(\d+)/
+            );
+
+
+        if (!match) {
+            return null;
+        }
+
+
+        return {
+            r:
+                Number(
+                    match[1]
+                ),
+            g:
+                Number(
+                    match[2]
+                ),
+            b:
+                Number(
+                    match[3]
+                )
+        };
+    }
+
+
+    function backgroundRgb(
         element
     ) {
 
         try {
 
-            const value =
+            return parseRgb(
                 getComputedStyle(
                     element
-                ).backgroundColor;
-
-
-            const match =
-                String(value).match(
-                    /rgba?\(\s*(\d+)[,\s]+(\d+)[,\s]+(\d+)/
-                );
-
-
-            if (!match) {
-                return null;
-            }
-
-
-            return {
-                r:
-                    Number(match[1]),
-
-                g:
-                    Number(match[2]),
-
-                b:
-                    Number(match[3])
-            };
+                ).backgroundColor
+            );
 
         } catch {
 
@@ -267,7 +362,7 @@ function installScreenShareUi(
     ) {
 
         const rgb =
-            getBackgroundRgb(
+            backgroundRgb(
                 element
             );
 
@@ -278,21 +373,24 @@ function installScreenShareUi(
 
 
         return (
-            rgb.r >= 150 &&
+            rgb.r >=
+            145 &&
             rgb.r >
-            rgb.g * 1.35 &&
+            rgb.g *
+            1.30 &&
             rgb.r >
-            rgb.b * 1.20
+            rgb.b *
+            1.15
         );
     }
 
 
-    function looksBlue(
+    function looksActiveBlue(
         element
     ) {
 
         const rgb =
-            getBackgroundRgb(
+            backgroundRgb(
                 element
             );
 
@@ -303,11 +401,14 @@ function installScreenShareUi(
 
 
         return (
-            rgb.b >= 90 &&
+            rgb.b >=
+            70 &&
             rgb.b >
-            rgb.r + 30 &&
+            rgb.r +
+            20 &&
             rgb.b >
-            rgb.g + 18
+            rgb.g +
+            12
         );
     }
 
@@ -332,13 +433,15 @@ function installScreenShareUi(
             );
 
 
-        const ariaPressed =
-            button.getAttribute?.(
-                "aria-pressed"
+        const pressed =
+            normalizeText(
+                button.getAttribute?.(
+                    "aria-pressed"
+                )
             );
 
 
-        const dataState =
+        const state =
             normalizeText(
                 button.getAttribute?.(
                     "data-state"
@@ -347,7 +450,7 @@ function installScreenShareUi(
 
 
         if (
-            ariaPressed ===
+            pressed ===
             "true"
         ) {
             return true;
@@ -356,12 +459,11 @@ function installScreenShareUi(
 
         if (
             [
-                "on",
                 "active",
-                "checked",
-                "open"
+                "on",
+                "checked"
             ].includes(
-                dataState
+                state
             )
         ) {
             return true;
@@ -374,10 +476,13 @@ function installScreenShareUi(
                 "stop share",
                 "stop screen",
                 "stop screenshare",
+                "disable screen share",
+                "turn off screen share",
                 "parar compartilhamento",
                 "parar transmissao",
                 "encerrar compartilhamento",
-                "interromper compartilhamento"
+                "desativar compartilhamento",
+                "desligar compartilhamento"
             ].some(
                 term =>
                     text.includes(
@@ -389,118 +494,17 @@ function installScreenShareUi(
         }
 
 
-        /*
-         * No Sharkord o controle ativo de screen share recebe
-         * fundo azul. O controle inativo é cinza.
-         */
-        return looksBlue(
+        return looksActiveBlue(
             button
         );
     }
 
 
-    function findNeutralTemplate(
-        parent,
-        activeButton
-    ) {
-
-        if (
-            !parent ||
-            !activeButton
-        ) {
-            return null;
-        }
-
-
-        const activeRect =
-            activeButton.getBoundingClientRect();
-
-
-        const candidates =
-            Array.from(
-                parent.querySelectorAll(
-                    "button, [role='button']"
-                )
-            )
-                .filter(
-                    candidate => {
-
-                        if (
-                            candidate ===
-                            activeButton ||
-                            isOurButton(
-                                candidate
-                            ) ||
-                            !isVisible(
-                                candidate
-                            ) ||
-                            looksRed(
-                                candidate
-                            ) ||
-                            looksBlue(
-                                candidate
-                            )
-                        ) {
-                            return false;
-                        }
-
-
-                        const rect =
-                            candidate.getBoundingClientRect();
-
-
-                        return (
-                            rect.width >=
-                            26 &&
-                            rect.width <=
-                            64 &&
-                            rect.height >=
-                            26 &&
-                            rect.height <=
-                            64
-                        );
-                    }
-                )
-                .map(
-                    candidate => {
-
-                        const rect =
-                            candidate.getBoundingClientRect();
-
-
-                        return {
-                            candidate,
-
-                            distance:
-                                Math.abs(
-                                    rect.width -
-                                    activeRect.width
-                                ) +
-                                Math.abs(
-                                    rect.height -
-                                    activeRect.height
-                                )
-                        };
-                    }
-                )
-                .sort(
-                    (a, b) =>
-                        a.distance -
-                        b.distance
-                );
-
-
-        return candidates[0]
-            ?.candidate ||
-            null;
-    }
-
-
     // ==================================================
-    // CALL BAR
+    // CALL BAR — ÚNICA FONTE DE VERDADE
     // ==================================================
 
-    function findCallBarDisconnectButton() {
+    function findDisconnectButton() {
 
         const candidates =
             Array.from(
@@ -515,7 +519,7 @@ function installScreenShareUi(
 
 
         let winnerScore =
-            -1;
+            -Infinity;
 
 
         for (
@@ -536,15 +540,18 @@ function installScreenShareUi(
 
 
             const rect =
-                element.getBoundingClientRect();
+                element
+                    .getBoundingClientRect();
 
 
             if (
-                rect.width < 30 ||
-                rect.height < 30 ||
+                rect.width <
+                30 ||
+                rect.height <
+                30 ||
                 rect.bottom <
                 window.innerHeight *
-                0.50
+                0.45
             ) {
                 continue;
             }
@@ -566,7 +573,7 @@ function installScreenShareUi(
                 )
             ) {
                 score +=
-                    200;
+                    250;
             }
 
 
@@ -587,14 +594,17 @@ function installScreenShareUi(
                 )
             ) {
                 score +=
-                    120;
+                    150;
             }
 
 
+            /*
+             * A call bar real fica na metade inferior.
+             */
             score +=
                 rect.top /
                 window.innerHeight *
-                30;
+                40;
 
 
             if (
@@ -613,16 +623,16 @@ function installScreenShareUi(
 
 
         return winnerScore >=
-            100
+            130
                 ? winner
                 : null;
     }
 
 
-    function findCallBarShareButton() {
+    function findCallBarControls() {
 
         const disconnect =
-            findCallBarDisconnectButton();
+            findDisconnectButton();
 
 
         if (!disconnect) {
@@ -635,11 +645,14 @@ function installScreenShareUi(
 
 
         for (
-            let depth = 0;
+            let depth =
+                0;
             root &&
-            depth < 7;
+            depth <
+            7;
             depth++,
-            root = root.parentElement
+            root =
+                root.parentElement
         ) {
 
             const buttons =
@@ -661,7 +674,8 @@ function installScreenShareUi(
                         button => ({
                             button,
                             rect:
-                                button.getBoundingClientRect()
+                                button
+                                    .getBoundingClientRect()
                         })
                     )
                     .sort(
@@ -671,7 +685,7 @@ function installScreenShareUi(
                     );
 
 
-            const index =
+            const disconnectIndex =
                 buttons.findIndex(
                     item =>
                         item.button ===
@@ -680,13 +694,62 @@ function installScreenShareUi(
 
 
             if (
-                index >
-                0
+                disconnectIndex >=
+                2
             ) {
 
-                return buttons[
-                    index - 1
-                ].button;
+                const screen =
+                    buttons[
+                        disconnectIndex -
+                        1
+                    ].button;
+
+
+                const template =
+                    buttons[
+                        disconnectIndex -
+                        2
+                    ].button;
+
+
+                const screenRect =
+                    screen
+                        .getBoundingClientRect();
+
+
+                const templateRect =
+                    template
+                        .getBoundingClientRect();
+
+
+                /*
+                 * Os controles da call bar precisam estar
+                 * aproximadamente na mesma linha.
+                 * Isso impede pegar botões da sidebar quando
+                 * subimos demais na árvore do DOM.
+                 */
+                if (
+                    Math.abs(
+                        screenRect.top -
+                        templateRect.top
+                    ) <=
+                    12 &&
+                    Math.abs(
+                        screenRect.top -
+                        disconnect
+                            .getBoundingClientRect()
+                            .top
+                    ) <=
+                    18
+                ) {
+
+                    return {
+                        root,
+                        disconnect,
+                        screen,
+                        template
+                    };
+                }
             }
         }
 
@@ -696,7 +759,7 @@ function installScreenShareUi(
 
 
     // ==================================================
-    // VOICE CONNECTED
+    // VOICE CONNECTED — SOMENTE POSICIONAMENTO
     // ==================================================
 
     function findVoiceConnectedCard() {
@@ -709,11 +772,11 @@ function installScreenShareUi(
             );
 
 
-        let best =
+        let winner =
             null;
 
 
-        let bestScore =
+        let winnerScore =
             -Infinity;
 
 
@@ -753,14 +816,15 @@ function installScreenShareUi(
 
 
             const rect =
-                element.getBoundingClientRect();
+                element
+                    .getBoundingClientRect();
 
 
             if (
                 rect.width >
-                700 ||
+                520 ||
                 rect.height >
-                260
+                220
             ) {
                 continue;
             }
@@ -783,49 +847,64 @@ function installScreenShareUi(
                     );
 
 
-            let score =
-                100;
-
-
             if (
-                buttons.length >=
+                buttons.length <
                 2
             ) {
-                score +=
-                    50;
+                continue;
             }
 
 
+            let score =
+                200;
+
+
+            if (
+                text.includes(
+                    "disconnect"
+                ) ||
+                text.includes(
+                    "desconectar"
+                )
+            ) {
+                score +=
+                    80;
+            }
+
+
+            /*
+             * Prefere o menor container que contém o card.
+             */
             score -=
                 rect.width /
-                30;
+                15;
 
 
             score -=
                 rect.height /
-                20;
+                10;
 
 
             if (
                 score >
-                bestScore
+                winnerScore
             ) {
 
-                best =
+                winner =
                     element;
 
 
-                bestScore =
+                winnerScore =
                     score;
             }
         }
 
 
-        return best;
+        return winner;
     }
 
 
-    function findVoiceShareButton() {
+    function findVoiceControls() {
 
         const card =
             findVoiceConnectedCard();
@@ -836,7 +915,7 @@ function installScreenShareUi(
         }
 
 
-        const smallButtons =
+        const buttons =
             Array.from(
                 card.querySelectorAll(
                     "button, [role='button']"
@@ -855,13 +934,18 @@ function installScreenShareUi(
                     button => ({
                         button,
                         rect:
-                            button.getBoundingClientRect()
+                            button
+                                .getBoundingClientRect()
                     })
                 )
                 .filter(
                     item =>
+                        item.rect.width >=
+                        24 &&
                         item.rect.width <=
                         64 &&
+                        item.rect.height >=
+                        24 &&
                         item.rect.height <=
                         64
                 )
@@ -872,72 +956,402 @@ function installScreenShareUi(
                 );
 
 
-        return smallButtons
-            .at(-1)
-            ?.button ||
-            null;
+        if (
+            buttons.length <
+            2
+        ) {
+            return null;
+        }
+
+
+        return {
+            card,
+            screen:
+                buttons
+                    .at(-1)
+                    .button,
+            template:
+                buttons
+                    .at(-2)
+                    .button
+        };
     }
 
 
     // ==================================================
-    // BOTÃO VISUAL
+    // ÍCONE DO SCREEN SHARE DA LATERAL ESQUERDA
     // ==================================================
 
-    function copyExactGeometry(
-        button,
-        template
-    ) {
-
-        const rect =
-            template.getBoundingClientRect();
+    const MONITOR_ON_CONTENT =
+        '<rect width="20" height="14" x="2" y="3" rx="2" ry="2"></rect>' +
+        '<line x1="8" x2="16" y1="21" y2="21"></line>' +
+        '<line x1="12" x2="12" y1="17" y2="21"></line>';
 
 
-        const style =
-            getComputedStyle(
-                template
+    function forceVoiceScreenOpenIcon() {
+
+        const voice =
+            findVoiceControls();
+
+
+        const button =
+            voice?.screen;
+
+
+        const svg =
+            button?.querySelector(
+                "svg"
             );
 
 
+        if (!svg) {
+            return;
+        }
+
+
+        /*
+         * Preserva o SVG nativo do Sharkord:
+         * classes, width/height, stroke, linecap, etc.
+         *
+         * Trocamos APENAS os elementos internos do MonitorOff
+         * pelos elementos do Monitor normal.
+         */
+        if (
+            svg.getAttribute(
+                "data-sharkord-monitor-on"
+            ) ===
+            "true" &&
+            !svg.querySelector(
+                'path[d*="2 2"]'
+            )
+        ) {
+            return;
+        }
+
+
+        svg.innerHTML =
+            MONITOR_ON_CONTENT;
+
+
+        svg.setAttribute(
+            "data-sharkord-monitor-on",
+            "true"
+        );
+
+
+        /*
+         * Se uma versão anterior deixou visibility:hidden,
+         * revelamos imediatamente o ícone já corrigido.
+         */
+        svg.style.visibility =
+            "";
+
+
+        button.removeAttribute(
+            "data-sharkord-screen-icon-pending"
+        );
+    }
+
+
+    function setVoiceScreenIconPending(
+        voiceControls,
+        pending
+    ) {
+
+        const button =
+            voiceControls?.screen;
+
+
+        const svg =
+            button?.querySelector(
+                "svg"
+            );
+
+
+        if (!svg) {
+            return;
+        }
+
+
+        if (pending) {
+
+            svg.style.visibility =
+                "hidden";
+
+
+            button.setAttribute(
+                "data-sharkord-screen-icon-pending",
+                "true"
+            );
+
+
+            return;
+        }
+
+
+        svg.style.visibility =
+            "";
+
+
+        button.removeAttribute(
+            "data-sharkord-screen-icon-pending"
+        );
+    }
+
+
+    function syncVoiceScreenIcon(
+        callControls,
+        voiceControls
+    ) {
+
+        const sourceButton =
+            callControls?.screen;
+
+
+        const targetButton =
+            voiceControls?.screen;
+
+
+        if (
+            !sourceButton ||
+            !targetButton ||
+            sourceButton ===
+            targetButton
+        ) {
+            return;
+        }
+
+
+        const sourceSvg =
+            sourceButton.querySelector(
+                "svg"
+            );
+
+
+        const targetSvg =
+            targetButton.querySelector(
+                "svg"
+            );
+
+
+        if (
+            !sourceSvg ||
+            !targetSvg
+        ) {
+            return;
+        }
+
+
+        /*
+         * O botão da lateral esquerda estava mostrando o estado
+         * visual inverso. O botão da call bar é a referência
+         * correta; copiamos SOMENTE o SVG dele.
+         *
+         * Nenhum handler, classe, estado React ou comportamento
+         * do botão esquerdo é alterado.
+         */
+        const sourceMarkup =
+            sourceSvg.outerHTML;
+
+
+        /*
+         * Comparamos o SVG que está REALMENTE renderizado.
+         *
+         * O React pode reconstruir o botão esquerdo depois que
+         * fazemos a troca. A versão anterior guardava uma flag
+         * no botão e, quando isso acontecia, acreditava que o
+         * ícone ainda estava correto.
+         *
+         * Agora, se o React recolocar o ícone invertido, o
+         * MutationObserver chama refreshButtons() e corrigimos
+         * novamente.
+         */
+        if (
+            targetSvg.outerHTML ===
+            sourceMarkup
+        ) {
+            return;
+        }
+
+
+        const clone =
+            sourceSvg.cloneNode(
+                true
+            );
+
+
+        clone.style.visibility =
+            "";
+
+
+        targetSvg.replaceWith(
+            clone
+        );
+
+
+        targetButton.removeAttribute(
+            "data-sharkord-screen-icon-pending"
+        );
+    }
+
+
+    // ==================================================
+    // CLONE VISUAL EXATO, SEM CLONAR DOM NATIVO
+    // ==================================================
+
+    function copyComputedStyle(
+        source,
+        target
+    ) {
+
+        const style =
+            getComputedStyle(
+                source
+            );
+
+
+        for (
+            const property
+            of style
+        ) {
+
+            try {
+
+                target.style.setProperty(
+                    property,
+                    style.getPropertyValue(
+                        property
+                    ),
+                    style.getPropertyPriority(
+                        property
+                    )
+                );
+
+            } catch {}
+        }
+    }
+
+
+    function getNativeIconSize(
+        template
+    ) {
+
+        const graphic =
+            template.querySelector(
+                "svg"
+            );
+
+
+        if (!graphic) {
+
+            return {
+                width:
+                    18,
+                height:
+                    18
+            };
+        }
+
+
+        const rect =
+            graphic
+                .getBoundingClientRect();
+
+
+        const width =
+            rect.width >=
+            12 &&
+            rect.width <=
+            28
+                ? rect.width
+                : 18;
+
+
+        const height =
+            rect.height >=
+            12 &&
+            rect.height <=
+            28
+                ? rect.height
+                : 18;
+
+
+        return {
+            width,
+            height
+        };
+    }
+
+
+    function buildSwitchButton(
+        template,
+        id,
+        locationName
+    ) {
+
+        /*
+         * Elemento NOVO.
+         * Nada de cloneNode(), classes internas, masks ou
+         * pseudo-elementos do botão de câmera/screen share.
+         */
+        const button =
+            document.createElement(
+                "button"
+            );
+
+
+        copyComputedStyle(
+            template,
+            button
+        );
+
+
+        const templateRect =
+            template
+                .getBoundingClientRect();
+
+
+        /*
+         * getComputedStyle já traz as dimensões computadas,
+         * mas fixamos o border-box observado para evitar que
+         * flex-shrink altere o botão depois da inserção.
+         */
         button.style.width =
-            rect.width + "px";
-
-
-        button.style.height =
-            rect.height + "px";
-
-
-        button.style.minWidth =
-            rect.width + "px";
-
-
-        button.style.minHeight =
-            rect.height + "px";
-
-
-        button.style.maxWidth =
-            rect.width + "px";
-
-
-        button.style.maxHeight =
-            rect.height + "px";
-
-
-        button.style.flex =
-            "0 0 " +
-            rect.width +
+            templateRect.width +
             "px";
 
 
-        button.style.padding =
-            style.padding;
+        button.style.height =
+            templateRect.height +
+            "px";
 
 
-        button.style.margin =
-            style.margin;
+        button.style.minWidth =
+            templateRect.width +
+            "px";
 
 
-        button.style.borderRadius =
-            style.borderRadius;
+        button.style.minHeight =
+            templateRect.height +
+            "px";
+
+
+        button.style.maxWidth =
+            templateRect.width +
+            "px";
+
+
+        button.style.maxHeight =
+            templateRect.height +
+            "px";
+
+
+        button.style.flexShrink =
+            "0";
+
+
+        button.style.boxSizing =
+            "border-box";
 
 
         button.style.display =
@@ -956,194 +1370,16 @@ function installScreenShareUi(
             "0";
 
 
-        button.style.boxSizing =
-            "border-box";
-
-
         button.style.cursor =
             "pointer";
 
 
-        /*
-         * Evita que classes de estado/animação alterem a escala
-         * do botão clonado.
-         */
+        button.style.pointerEvents =
+            "auto";
+
+
         button.style.transform =
             "none";
-
-
-        button.style.scale =
-            "1";
-
-
-        button.style.position =
-            style.position ===
-            "absolute"
-                ? "relative"
-                : style.position;
-
-
-        button.style.inset =
-            "auto";
-    }
-
-
-    function replaceNativeIcon(
-        button,
-        source
-    ) {
-
-        const sourceSvg =
-            source.querySelector?.(
-                "svg"
-            );
-
-
-        const clonedSvg =
-            button.querySelector?.(
-                "svg"
-            );
-
-
-        const holder =
-            document.createElement(
-                "div"
-            );
-
-
-        holder.innerHTML =
-            SWITCH_ICON;
-
-
-        const switchSvg =
-            holder.firstElementChild;
-
-
-        if (!switchSvg) {
-            return;
-        }
-
-
-        if (sourceSvg) {
-
-            const sourceSvgStyle =
-                getComputedStyle(
-                    sourceSvg
-                );
-
-
-            const sourceClass =
-                sourceSvg.getAttribute(
-                    "class"
-                );
-
-
-            if (sourceClass) {
-
-                switchSvg.setAttribute(
-                    "class",
-                    sourceClass
-                );
-            }
-
-
-            const nativeWidth =
-                sourceSvg.getAttribute(
-                    "width"
-                );
-
-
-            const nativeHeight =
-                sourceSvg.getAttribute(
-                    "height"
-                );
-
-
-            if (nativeWidth) {
-
-                switchSvg.setAttribute(
-                    "width",
-                    nativeWidth
-                );
-            }
-
-
-            if (nativeHeight) {
-
-                switchSvg.setAttribute(
-                    "height",
-                    nativeHeight
-                );
-            }
-
-
-            switchSvg.style.width =
-                sourceSvgStyle.width;
-
-
-            switchSvg.style.height =
-                sourceSvgStyle.height;
-
-
-            switchSvg.style.display =
-                sourceSvgStyle.display ===
-                "none"
-                    ? "block"
-                    : sourceSvgStyle.display;
-
-
-            switchSvg.style.flexShrink =
-                "0";
-
-
-            switchSvg.style.transform =
-                "none";
-        }
-
-
-        if (clonedSvg) {
-
-            clonedSvg.replaceWith(
-                switchSvg
-            );
-
-
-            return;
-        }
-
-
-        /*
-         * Fallback raro: se o botão nativo não usar SVG,
-         * mantemos o próprio container e colocamos o ícone nele.
-         */
-        const content =
-            button.firstElementChild ||
-            button;
-
-
-        content.replaceChildren(
-            switchSvg
-        );
-    }
-
-
-    function makeSwitchButton({
-        id,
-        stopButton,
-        template,
-        locator,
-        locationName
-    }) {
-
-        const source =
-            template ||
-            stopButton;
-
-
-        const button =
-            source.cloneNode(
-                true
-            );
 
 
         button.id =
@@ -1156,26 +1392,6 @@ function installScreenShareUi(
 
         button.disabled =
             false;
-
-
-        button.removeAttribute(
-            "aria-describedby"
-        );
-
-
-        button.removeAttribute(
-            "aria-pressed"
-        );
-
-
-        button.removeAttribute(
-            "data-state"
-        );
-
-
-        button.removeAttribute(
-            "data-radix-collection-item"
-        );
 
 
         button.setAttribute(
@@ -1192,84 +1408,74 @@ function installScreenShareUi(
 
         button.setAttribute(
             "data-sharkord-screen-switch",
-            "true"
+            locationName
         );
 
 
-        button.classList.add(
-            "__sharkord-screen-switch-button"
-        );
-
-
-        replaceNativeIcon(
-            button,
-            source
-        );
-
-
-        /*
-         * Alguns botões nativos carregam texto auxiliar oculto
-         * ("desativar tela", etc.). Removemos apenas nós de texto
-         * do clone para o botão custom não herdar semântica errada.
-         */
-        const walker =
-            document.createTreeWalker(
-                button,
-                NodeFilter.SHOW_TEXT
+        const holder =
+            document.createElement(
+                "div"
             );
 
 
-        const textNodes =
-            [];
+        holder.innerHTML =
+            SWITCH_ICON;
 
 
-        while (
-            walker.nextNode()
-        ) {
+        const svg =
+            holder.firstElementChild;
 
-            textNodes.push(
-                walker.currentNode
+
+        const iconSize =
+            getNativeIconSize(
+                template
+            );
+
+
+        if (svg) {
+
+            svg.setAttribute(
+                "width",
+                String(
+                    iconSize.width
+                )
+            );
+
+
+            svg.setAttribute(
+                "height",
+                String(
+                    iconSize.height
+                )
+            );
+
+
+            svg.style.width =
+                iconSize.width +
+                "px";
+
+
+            svg.style.height =
+                iconSize.height +
+                "px";
+
+
+            svg.style.display =
+                "block";
+
+
+            svg.style.flex =
+                "0 0 auto";
+
+
+            svg.style.pointerEvents =
+                "none";
+
+
+            button.appendChild(
+                svg
             );
         }
-
-
-        for (
-            const textNode
-            of textNodes
-        ) {
-
-            if (
-                textNode.textContent?.trim()
-            ) {
-
-                textNode.textContent =
-                    "";
-            }
-        }
-
-
-        copyExactGeometry(
-            button,
-            source
-        );
-
-
-        const sourceStyle =
-            getComputedStyle(
-                source
-            );
-
-
-        button.style.background =
-            sourceStyle.background;
-
-
-        button.style.backgroundColor =
-            sourceStyle.backgroundColor;
-
-
-        button.style.color =
-            sourceStyle.color;
 
 
         button.addEventListener(
@@ -1281,12 +1487,40 @@ function installScreenShareUi(
                 event.stopImmediatePropagation();
 
 
-                void switchSource(
-                    locator,
-                    locationName
-                );
+                void switchSource();
             },
             true
+        );
+
+
+        console.log(
+            "[ScreenShare Button V2] criado:",
+            {
+                location:
+                    locationName,
+                button:
+                    {
+                        width:
+                            Math.round(
+                                templateRect.width
+                            ),
+                        height:
+                            Math.round(
+                                templateRect.height
+                            )
+                    },
+                icon:
+                    {
+                        width:
+                            Math.round(
+                                iconSize.width
+                            ),
+                        height:
+                            Math.round(
+                                iconSize.height
+                            )
+                    }
+            }
         );
 
 
@@ -1294,55 +1528,371 @@ function installScreenShareUi(
     }
 
 
-    function setButtonsBusy(
-        busy
+    function removeButton(
+        id
     ) {
 
-        for (
-            const id
-            of [
-                VOICE_BUTTON_ID,
-                CALL_BUTTON_ID
-            ]
+        document
+            .getElementById(
+                id
+            )
+            ?.remove();
+    }
+
+
+    function removeButtons() {
+
+        removeButton(
+            VOICE_BUTTON_ID
+        );
+
+
+        removeButton(
+            CALL_BUTTON_ID
+        );
+    }
+
+
+    function installAt(
+        controls,
+        id,
+        locationName
+    ) {
+
+        if (
+            !controls ||
+            !controls.screen ||
+            !controls.template
         ) {
 
-            const button =
-                document.getElementById(
+            removeButton(
+                id
+            );
+
+
+            return false;
+        }
+
+
+        const parent =
+            controls.screen
+                .parentElement;
+
+
+        if (!parent) {
+
+            removeButton(
+                id
+            );
+
+
+            return false;
+        }
+
+
+        const existing =
+            document
+                .getElementById(
                     id
                 );
 
 
-            if (button) {
+        if (
+            existing?.isConnected &&
+            existing.parentElement ===
+            parent &&
+            existing.nextElementSibling ===
+            controls.screen
+        ) {
 
-                button.disabled =
-                    busy;
+            const existingRect =
+                existing
+                    .getBoundingClientRect();
 
 
-                button.style.opacity =
-                    busy
-                        ? "0.55"
-                        : "";
+            const templateRect =
+                controls.template
+                    .getBoundingClientRect();
+
+
+            if (
+                Math.abs(
+                    existingRect.width -
+                    templateRect.width
+                ) <
+                0.6 &&
+                Math.abs(
+                    existingRect.height -
+                    templateRect.height
+                ) <
+                0.6
+            ) {
+                return true;
             }
         }
+
+
+        existing?.remove();
+
+
+        const button =
+            buildSwitchButton(
+                controls.template,
+                id,
+                locationName
+            );
+
+
+        parent.insertBefore(
+            button,
+            controls.screen
+        );
+
+
+        return true;
     }
 
 
-    // ==================================================
-    // TROCA — PICKER PRIMEIRO
-    // ==================================================
-
-    async function switchSource(
-        locator,
-        locationName
+    function bindNativeScreenButton(
+        controls
     ) {
+
+        const button =
+            controls?.screen;
+
+
+        if (
+            !button ||
+            button
+                .__sharkordShareStateTrackingV2
+        ) {
+            return;
+        }
+
+
+        button
+            .__sharkordShareStateTrackingV2 =
+            true;
+
+
+        button.addEventListener(
+            "click",
+            () => {
+
+                /*
+                 * Se já estávamos compartilhando, um clique no
+                 * controle nativo é STOP. Quando não estamos,
+                 * o mesmo botão é START; nesse caso quem confirma
+                 * o início é o main/screen-share.js após a captura.
+                 */
+                if (
+                    getLocalSharingState()
+                ) {
+
+                    setLocalSharingState(
+                        false,
+                        switching
+                            ? "switch-stop"
+                            : "native-stop"
+                    );
+
+
+                    queueRefresh();
+                }
+            },
+            true
+        );
+    }
+
+
+    function refreshButtons() {
+
+        refreshTimer =
+            null;
+
 
         if (switching) {
             return;
         }
 
 
+        const call =
+            findCallBarControls();
+
+
+        let sharing =
+            getLocalSharingState();
+
+
+        /*
+         * Se a call bar some por tempo suficiente (leave/disconnect),
+         * encerra também nosso estado local. Um pequeno grace period
+         * evita falso STOP durante uma reconstrução rápida do React.
+         */
+        if (
+            sharing &&
+            !call
+        ) {
+
+            if (!missingCallSince) {
+
+                missingCallSince =
+                    Date.now();
+            }
+
+
+            if (
+                Date.now() -
+                missingCallSince >=
+                1200
+            ) {
+
+                setLocalSharingState(
+                    false,
+                    "call-bar-disappeared"
+                );
+
+
+                sharing =
+                    false;
+
+
+                missingCallSince =
+                    0;
+            }
+
+        } else {
+
+            missingCallSince =
+                0;
+        }
+
+
+        if (
+            call
+        ) {
+
+            bindNativeScreenButton(
+                call
+            );
+        }
+
+
+        /*
+         * CORREÇÃO VISUAL INDEPENDENTE DO ESTADO DE SHARE:
+         *
+         * O botão nativo da lateral esquerda estava mostrando
+         * o ícone inverso. A call bar é a referência visual.
+         *
+         * Isso precisa rodar ANTES do return abaixo, porque o
+         * estado interno do botão custom pode estar false mesmo
+         * enquanto a call bar continua renderizada.
+         */
+        const voice =
+            findVoiceControls();
+
+
+        if (
+            voice &&
+            !call
+        ) {
+
+            /*
+             * A lateral esquerda monta antes da call bar.
+             * Corrigimos o MonitorOff imediatamente, sem esperar
+             * a referência da direita.
+             */
+            forceVoiceScreenOpenIcon();
+        }
+
+
+        if (
+            call &&
+            voice
+        ) {
+
+            syncVoiceScreenIcon(
+                call,
+                voice
+            );
+
+
+            setVoiceScreenIconPending(
+                voice,
+                false
+            );
+        }
+
+
+        if (
+            sharing !==
+            lastKnownSharing
+        ) {
+
+            lastKnownSharing =
+                sharing;
+
+
+            console.log(
+                "[ScreenShare Button V2] sharingScreen real:",
+                sharing
+            );
+        }
+
+
+        if (
+            !sharing ||
+            !call
+        ) {
+
+            removeButtons();
+
+
+            return;
+        }
+
+
+        installAt(
+            call,
+            CALL_BUTTON_ID,
+            "call-bar"
+        );
+
+
+        installAt(
+            voice,
+            VOICE_BUTTON_ID,
+            "voice-connected"
+        );
+    }
+
+
+    function queueRefresh() {
+
+        if (
+            refreshTimer
+        ) {
+            return;
+        }
+
+
+        refreshTimer =
+            setTimeout(
+                refreshButtons,
+                40
+            );
+    }
+
+
+    // ==================================================
+    // TROCA — SEM USAR O BOTÃO DA SIDEBAR PARA ESTADO
+    // ==================================================
+
+    async function chooseNextSource() {
+
         const api =
-            window.electronScreenShare;
+            window
+                .electronScreenShare;
 
 
         if (
@@ -1351,9 +1901,158 @@ function installScreenShareUi(
             "function"
         ) {
 
-            console.error(
-                "[ScreenShare UI V6] electronScreenShare.chooseSource indisponível."
+            throw new Error(
+                "electronScreenShare.chooseSource indisponível"
             );
+        }
+
+
+        try {
+
+            return await api
+                .chooseSource();
+
+        } catch (error) {
+
+            const message =
+                error?.message ||
+                String(
+                    error
+                );
+
+
+            if (
+                message.includes(
+                    "SCREEN_SHARE_CANCELLED"
+                )
+            ) {
+                return null;
+            }
+
+
+            throw error;
+        }
+    }
+
+
+    async function waitForScreenControlRebuild(
+        previousButton,
+        timeoutMs
+    ) {
+
+        const deadline =
+            Date.now() +
+            timeoutMs;
+
+
+        while (
+            Date.now() <
+            deadline
+        ) {
+
+            const controls =
+                findCallBarControls();
+
+
+            if (
+                controls?.screen &&
+                (
+                    controls.screen !==
+                    previousButton ||
+                    !previousButton?.isConnected
+                )
+            ) {
+
+                return controls;
+            }
+
+
+            await delay(
+                100
+            );
+        }
+
+
+        /*
+         * Alguns builds do React reaproveitam o mesmo nó.
+         * Depois do timeout curto, aceitamos o controle atual.
+         */
+        const fallback =
+            findCallBarControls();
+
+
+        if (
+            fallback?.screen
+        ) {
+            return fallback;
+        }
+
+
+        throw new Error(
+            "controle de screen share não reapareceu"
+        );
+    }
+
+
+    async function waitForRealSharing(
+        active,
+        timeoutMs
+    ) {
+
+        const deadline =
+            Date.now() +
+            timeoutMs;
+
+
+        while (
+            Date.now() <
+            deadline
+        ) {
+
+            if (
+                getLocalSharingState() ===
+                active
+            ) {
+                return true;
+            }
+
+
+            await delay(
+                100
+            );
+        }
+
+
+        throw new Error(
+            active
+                ? "main não confirmou início do screen share"
+                : "screen share não confirmou parada"
+        );
+    }
+
+
+    async function switchSource() {
+
+        if (switching) {
+            return;
+        }
+
+
+        const initial =
+            findCallBarControls();
+
+
+        if (
+            !initial ||
+            !getLocalSharingState()
+        ) {
+
+            console.warn(
+                "[ScreenShare Button V2] troca ignorada: share local não está ativo."
+            );
+
+
+            queueRefresh();
 
 
             return;
@@ -1364,54 +2063,15 @@ function installScreenShareUi(
             true;
 
 
-        setButtonsBusy(
-            true
-        );
-
-
         try {
 
             console.log(
-                "[ScreenShare UI V6] abrindo picker ANTES de parar:",
-                locationName
+                "[ScreenShare Button V2] abrindo picker antes do stop."
             );
 
 
-            let selection =
-                null;
-
-
-            try {
-
-                selection =
-                    await api.chooseSource();
-
-            } catch (error) {
-
-                const message =
-                    error?.message ||
-                    String(
-                        error
-                    );
-
-
-                if (
-                    message.includes(
-                        "SCREEN_SHARE_CANCELLED"
-                    )
-                ) {
-
-                    console.log(
-                        "[ScreenShare UI V6] troca cancelada; share atual mantido."
-                    );
-
-
-                    return;
-                }
-
-
-                throw error;
-            }
+            const selection =
+                await chooseNextSource();
 
 
             if (
@@ -1420,7 +2080,7 @@ function installScreenShareUi(
             ) {
 
                 console.log(
-                    "[ScreenShare UI V6] picker não retornou fonte; share atual mantido."
+                    "[ScreenShare Button V2] troca cancelada; share atual mantido."
                 );
 
 
@@ -1429,410 +2089,153 @@ function installScreenShareUi(
 
 
             console.log(
-                "[ScreenShare UI V6] fonte preparada:",
+                "[ScreenShare Button V2] fonte preparada:",
                 selection
             );
 
 
-            const stopButton =
-                locator();
+            const beforeStop =
+                findCallBarControls();
 
 
-            if (!stopButton) {
-
-                throw new Error(
-                    "controle nativo de screen share não encontrado após o picker"
-                );
-            }
-
-
-            /*
-             * Agora sim encerramos a transmissão atual.
-             * O picker já terminou, então a desmontagem do React
-             * não consegue cancelar a seleção.
-             */
-            stopButton.click();
-
-
-            const oldButton =
-                stopButton;
-
-
-            const startedAt =
-                Date.now();
-
-
-            let startButton =
-                null;
-
-
-            /*
-             * Espera o React concluir a transição para sharingScreen=false.
-             * Não usamos apenas um delay curto: esperamos o nó mudar,
-             * desaparecer/reaparecer, ou pelo menos 850ms.
-             */
-            while (
-                Date.now() -
-                startedAt <
-                3500
+            if (
+                !beforeStop ||
+                !getLocalSharingState()
             ) {
 
-                await delay(
-                    100
-                );
-
-
-                const candidate =
-                    locator();
-
-
-                if (!candidate) {
-                    continue;
-                }
-
-
-                const elapsed =
-                    Date.now() -
-                    startedAt;
-
-
-                if (
-                    (
-                        candidate !==
-                        oldButton ||
-                        !oldButton.isConnected
-                    ) &&
-                    elapsed >=
-                    350
-                ) {
-
-                    startButton =
-                        candidate;
-
-                    break;
-                }
-
-
-                if (
-                    elapsed >=
-                    850
-                ) {
-
-                    startButton =
-                        candidate;
-
-                    break;
-                }
-            }
-
-
-            if (!startButton) {
-
                 throw new Error(
-                    "controle nativo não ficou pronto para reiniciar"
+                    "controle da call bar desapareceu antes do stop"
                 );
             }
 
 
             /*
-             * Pequena margem depois da atualização visual.
+             * Remove o custom antes do React reconstruir a barra.
+             * Assim não deixamos um filho estranho no meio da
+             * reconciliação do componente nativo.
              */
+            removeButtons();
+
+
+            const oldScreenButton =
+                beforeStop.screen;
+
+
+            oldScreenButton
+                .click();
+
+
+            /*
+             * O listener do próprio botão marca nosso estado como
+             * false imediatamente. O que precisamos esperar aqui é
+             * o React terminar de reconstruir/habilitar o controle.
+             */
+            await waitForRealSharing(
+                false,
+                1200
+            );
+
+
+            const inactive =
+                await waitForScreenControlRebuild(
+                    oldScreenButton,
+                    1800
+                );
+
+
             await delay(
                 250
             );
 
 
             console.log(
-                "[ScreenShare UI V6] reiniciando com fonte pré-selecionada."
+                "[ScreenShare Button V2] reiniciando pelo controle nativo da call bar."
             );
 
 
-            startButton.click();
+            inactive
+                .screen
+                .click();
+
+
+            /*
+             * O main só publica TRUE depois que o Chromium aceitou
+             * a fonte pré-selecionada no getDisplayMedia.
+             */
+            await waitForRealSharing(
+                true,
+                6500
+            );
+
+
+            console.log(
+                "[ScreenShare Button V2] troca concluída."
+            );
 
         } catch (error) {
 
             console.error(
-                "[ScreenShare UI V6] troca falhou:",
+                "[ScreenShare Button V2] troca falhou:",
                 error
             );
 
         } finally {
 
-            await delay(
-                350
-            );
-
-
             switching =
                 false;
 
 
-            setButtonsBusy(
-                false
-            );
-
-
-            installButtons();
+            queueRefresh();
         }
     }
 
 
     // ==================================================
-    // INSTALAÇÃO — VOICE CONNECTED
+    // START
     // ==================================================
 
-    function installVoiceButton() {
+    for (
+        const id
+        of LEGACY_IDS
+    ) {
 
-        const stopButton =
-            findVoiceShareButton();
-
-
-        if (!stopButton) {
-
-            document
-                .getElementById(
-                    VOICE_BUTTON_ID
-                )
-                ?.remove();
-
-
-            return false;
-        }
-
-
-        if (
-            !isActiveShareButton(
-                stopButton
+        document
+            .getElementById(
+                id
             )
-        ) {
-
-            document
-                .getElementById(
-                    VOICE_BUTTON_ID
-                )
-                ?.remove();
-
-
-            return false;
-        }
-
-
-        const parent =
-            stopButton.parentElement;
-
-
-        if (!parent) {
-            return false;
-        }
-
-
-        const existing =
-            document.getElementById(
-                VOICE_BUTTON_ID
-            );
-
-
-        if (
-            existing?.isConnected &&
-            existing.parentElement ===
-            parent &&
-            existing.nextElementSibling ===
-            stopButton
-        ) {
-            return true;
-        }
-
-
-        existing?.remove();
-
-
-        const template =
-            findNeutralTemplate(
-                parent,
-                stopButton
-            );
-
-
-        if (!template) {
-
-            console.warn(
-                "[ScreenShare UI V6] nenhum botão neutro encontrado no Voice Connected."
-            );
-
-
-            return false;
-        }
-
-
-        const button =
-            makeSwitchButton({
-                id:
-                    VOICE_BUTTON_ID,
-
-                stopButton,
-
-                template,
-
-                locator:
-                    findVoiceShareButton,
-
-                locationName:
-                    "voice-connected"
-            });
-
-
-        parent.insertBefore(
-            button,
-            stopButton
-        );
-
-
-        console.log(
-            "[ScreenShare UI V6] botão instalado no Voice Connected."
-        );
-
-
-        return true;
+            ?.remove();
     }
 
 
-    // ==================================================
-    // INSTALAÇÃO — CALL BAR
-    // ==================================================
+    window.addEventListener(
+        SHARE_STATE_EVENT,
+        event => {
 
-    function installCallButton() {
-
-        const stopButton =
-            findCallBarShareButton();
-
-
-        if (!stopButton) {
-
-            document
-                .getElementById(
-                    CALL_BUTTON_ID
-                )
-                ?.remove();
-
-
-            return false;
-        }
-
-
-        if (
-            !isActiveShareButton(
-                stopButton
-            )
-        ) {
-
-            document
-                .getElementById(
-                    CALL_BUTTON_ID
-                )
-                ?.remove();
-
-
-            return false;
-        }
-
-
-        const parent =
-            stopButton.parentElement;
-
-
-        if (!parent) {
-            return false;
-        }
-
-
-        const existing =
-            document.getElementById(
-                CALL_BUTTON_ID
+            console.log(
+                "[ScreenShare Button V2] evento de estado recebido:",
+                event?.detail ||
+                {}
             );
 
 
-        if (
-            existing?.isConnected &&
-            existing.parentElement ===
-            parent &&
-            existing.nextElementSibling ===
-            stopButton
-        ) {
-            return true;
+            queueRefresh();
         }
-
-
-        existing?.remove();
-
-
-        const template =
-            findNeutralTemplate(
-                parent,
-                stopButton
-            );
-
-
-        if (!template) {
-
-            console.warn(
-                "[ScreenShare UI V6] nenhum botão neutro encontrado na call bar."
-            );
-
-
-            return false;
-        }
-
-
-        const button =
-            makeSwitchButton({
-                id:
-                    CALL_BUTTON_ID,
-
-                stopButton,
-
-                template,
-
-                locator:
-                    findCallBarShareButton,
-
-                locationName:
-                    "call-bar"
-            });
-
-
-        parent.insertBefore(
-            button,
-            stopButton
-        );
-
-
-        console.log(
-            "[ScreenShare UI V6] botão instalado na call bar."
-        );
-
-
-        return true;
-    }
-
-
-    function installButtons() {
-
-        if (switching) {
-            return;
-        }
-
-
-        installVoiceButton();
-
-        installCallButton();
-    }
+    );
 
 
     const observer =
         new MutationObserver(
             () => {
 
-                installButtons();
+                /*
+                 * MutationObserver roda antes do próximo paint.
+                 * A correção visual não passa pelo debounce de 40ms,
+                 * evitando o frame inicial com MonitorOff.
+                 */
+                forceVoiceScreenOpenIcon();
+
+
+                queueRefresh();
             }
         );
 
@@ -1842,13 +2245,10 @@ function installScreenShareUi(
         {
             childList:
                 true,
-
             subtree:
                 true,
-
             attributes:
                 true,
-
             attributeFilter: [
                 "class",
                 "style",
@@ -1861,16 +2261,19 @@ function installScreenShareUi(
 
 
     setInterval(
-        installButtons,
+        queueRefresh,
         650
     );
 
 
-    installButtons();
+    forceVoiceScreenOpenIcon();
+
+
+    queueRefresh();
 
 
     console.log(
-        "[ScreenShare UI V6] módulo instalado — ícone de troca independente do estado nativo."
+        "[ScreenShare Button V2] módulo instalado — MonitorOff esquerdo corrigido antes do paint."
     );
 
 })();
@@ -1889,7 +2292,7 @@ function installScreenShareUi(
         } catch (error) {
 
             console.error(
-                "[ScreenShare UI V6] falha ao injetar:",
+                "[ScreenShare Button V2] falha ao injetar:",
                 error
             );
         }
