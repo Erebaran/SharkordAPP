@@ -1,7 +1,6 @@
 const {
     app,
     BrowserWindow,
-    desktopCapturer,
     session,
     ipcMain,
     dialog,
@@ -11,6 +10,20 @@ const {
 
 const path =
     require("path");
+
+
+const {
+    setupScreenShareMain
+} = require(
+    "./main/screen-share"
+);
+
+
+const {
+    installScreenShareUi
+} = require(
+    "./main/screen-share-ui"
+);
 
 
 const fs =
@@ -50,19 +63,23 @@ let mainWindow =
     null;
 
 
-let pickerWindow =
+let screenShareManager =
     null;
 
 
-let pickerResolve =
-    null;
+// ======================================================
+// APP SHUTDOWN
+// ======================================================
+
+let appIsQuitting =
+    false;
 
 
-let pickerReject =
-    null;
+let shutdownCleanupDone =
+    false;
 
 
-let selectedShareOptions =
+let forceExitTimer =
     null;
 
 
@@ -944,6 +961,144 @@ function stopProcessAudio(
 
 
     return true;
+}
+
+
+// ======================================================
+// APP SHUTDOWN
+// ======================================================
+
+function cleanupBeforeExit(
+    reason =
+    "desconhecido"
+) {
+
+    if (
+        shutdownCleanupDone
+    ) {
+        return;
+    }
+
+
+    shutdownCleanupDone =
+        true;
+
+
+    console.log(
+        "[Shutdown] iniciando limpeza:",
+        reason
+    );
+
+
+    try {
+
+        screenShareManager
+            ?.cancelPicker?.();
+
+    } catch (error) {
+
+        console.error(
+            "[Shutdown] erro fechando picker:",
+            error
+        );
+    }
+
+
+    try {
+
+        stopProcessAudio();
+
+    } catch (error) {
+
+        console.error(
+            "[Shutdown] erro encerrando Process Audio:",
+            error
+        );
+    }
+
+
+    console.log(
+        "[Shutdown] limpeza concluída."
+    );
+}
+
+
+function requestAppShutdown(
+    reason =
+    "desconhecido"
+) {
+
+    if (
+        appIsQuitting
+    ) {
+
+        console.log(
+            "[Shutdown] encerramento já em andamento:",
+            reason
+        );
+
+
+        return;
+    }
+
+
+    appIsQuitting =
+        true;
+
+
+    console.log(
+        "[Shutdown] encerramento solicitado:",
+        reason
+    );
+
+
+    cleanupBeforeExit(
+        reason
+    );
+
+
+    /*
+     * Proteção contra alguma janela/handler externo impedir
+     * indefinidamente o encerramento do Electron.
+     */
+    forceExitTimer =
+        setTimeout(
+            () => {
+
+                console.warn(
+                    "[Shutdown] app.quit() não finalizou a tempo; usando app.exit(0)."
+                );
+
+
+                app.exit(
+                    0
+                );
+            },
+            2500
+        );
+
+
+    setImmediate(
+        () => {
+
+            try {
+
+                app.quit();
+
+            } catch (error) {
+
+                console.error(
+                    "[Shutdown] app.quit() falhou:",
+                    error
+                );
+
+
+                app.exit(
+                    0
+                );
+            }
+        }
+    );
 }
 
 
@@ -2559,7 +2714,9 @@ function createServerWindow() {
                 mainWindow.isDestroyed()
             ) {
 
-                app.quit();
+                requestAppShutdown(
+                    "janela de seleção de servidor fechada"
+                );
             }
         }
     );
@@ -2642,6 +2799,11 @@ function createMainWindow() {
     );
 
 
+    installScreenShareUi(
+        mainWindow
+    );
+
+
     mainWindow.webContents.on(
         "console-message",
         event => {
@@ -2659,13 +2821,25 @@ function createMainWindow() {
         "close",
         event => {
 
+            /*
+             * Quando app.quit() já está em andamento, NÃO bloqueamos
+             * o close novamente. Isso evita o ciclo:
+             *
+             * close -> preventDefault -> app.quit -> close -> ...
+             */
             if (
+                appIsQuitting ||
                 updaterInstalling
             ) {
 
-                console.log(
-                    "[Updater] fechamento autorizado para instalar atualização."
-                );
+                if (
+                    updaterInstalling
+                ) {
+
+                    console.log(
+                        "[Updater] fechamento autorizado para instalar atualização."
+                    );
+                }
 
 
                 return;
@@ -2675,26 +2849,9 @@ function createMainWindow() {
             event.preventDefault();
 
 
-            cancelPicker();
-
-
-            stopProcessAudio();
-
-
-            if (
-                mainWindow &&
-                !mainWindow.isDestroyed()
-            ) {
-
-                mainWindow.destroy();
-            }
-
-
-            mainWindow =
-                null;
-
-
-            app.quit();
+            requestAppShutdown(
+                "janela principal fechada pelo usuário"
+            );
         }
     );
 
@@ -2702,9 +2859,6 @@ function createMainWindow() {
     mainWindow.on(
         "closed",
         () => {
-
-            stopProcessAudio();
-
 
             mainWindow =
                 null;
@@ -3018,688 +3172,6 @@ ipcMain.handle(
         };
     }
 );
-
-
-// ======================================================
-// PICKER
-// ======================================================
-
-function createPickerWindow() {
-
-    if (
-        pickerWindow &&
-        !pickerWindow.isDestroyed()
-    ) {
-
-        pickerWindow.focus();
-
-
-        return;
-    }
-
-
-    const appIcon =
-        getAppIcon();
-
-
-    pickerWindow =
-        new BrowserWindow({
-            width:
-                1000,
-
-            height:
-                720,
-
-            minWidth:
-                700,
-
-            minHeight:
-                550,
-
-            title:
-                "Escolher o que compartilhar",
-
-            icon:
-                appIcon ||
-                undefined,
-
-            modal:
-                true,
-
-            parent:
-            mainWindow,
-
-            autoHideMenuBar:
-                true,
-
-            webPreferences: {
-
-                preload:
-                    path.join(
-                        __dirname,
-                        "preload.js"
-                    ),
-
-                nodeIntegration:
-                    false,
-
-                contextIsolation:
-                    true,
-
-                sandbox:
-                    true
-            }
-        });
-
-
-    applyWindowIcon(
-        pickerWindow
-    );
-
-
-    const pickerPath =
-        path.join(
-            __dirname,
-            "picker.html"
-        );
-
-
-    console.log(
-        "Picker carregado de:",
-        pickerPath
-    );
-
-
-    pickerWindow.loadFile(
-        pickerPath
-    );
-
-
-    pickerWindow.on(
-        "closed",
-        () => {
-
-            pickerWindow =
-                null;
-
-
-            if (
-                pickerReject
-            ) {
-
-                const reject =
-                    pickerReject;
-
-
-                pickerResolve =
-                    null;
-
-
-                pickerReject =
-                    null;
-
-
-                selectedShareOptions =
-                    null;
-
-
-                reject(
-                    new Error(
-                        "SCREEN_SHARE_CANCELLED"
-                    )
-                );
-            }
-        }
-    );
-}
-
-
-function cancelPicker() {
-
-    const reject =
-        pickerReject;
-
-
-    pickerResolve =
-        null;
-
-
-    pickerReject =
-        null;
-
-
-    selectedShareOptions =
-        null;
-
-
-    if (
-        reject
-    ) {
-
-        reject(
-            new Error(
-                "SCREEN_SHARE_CANCELLED"
-            )
-        );
-    }
-
-
-    if (
-        pickerWindow &&
-        !pickerWindow.isDestroyed()
-    ) {
-
-        pickerWindow.destroy();
-    }
-
-
-    pickerWindow =
-        null;
-}
-
-
-// ======================================================
-// ABRIR PICKER
-// ======================================================
-
-ipcMain.handle(
-    "screenshare:choose-source",
-    async () => {
-
-        if (
-            pickerResolve ||
-            pickerReject
-        ) {
-
-            cancelPicker();
-        }
-
-
-        return new Promise(
-            (
-                resolve,
-                reject
-            ) => {
-
-                pickerResolve =
-                    resolve;
-
-
-                pickerReject =
-                    reject;
-
-
-                createPickerWindow();
-            }
-        );
-    }
-);
-
-
-// ======================================================
-// FONTES
-// ======================================================
-
-ipcMain.handle(
-    "screen:get-sources",
-    async (
-        _event,
-        type =
-        "window"
-    ) => {
-
-        const start =
-            Date.now();
-
-
-        const sourceType =
-            type ===
-            "screen"
-                ? "screen"
-                : "window";
-
-
-        try {
-
-            const sources =
-                await desktopCapturer
-                    .getSources({
-                        types: [
-                            sourceType
-                        ],
-
-                        thumbnailSize: {
-                            width:
-                                0,
-
-                            height:
-                                0
-                        },
-
-                        fetchWindowIcons:
-                            sourceType ===
-                            "window"
-                    });
-
-
-            console.log(
-                `${sourceType}: ${sources.length} fontes em ${Date.now() - start}ms`
-            );
-
-
-            return sources.map(
-                source => ({
-
-                    id:
-                    source.id,
-
-                    name:
-                    source.name,
-
-                    displayId:
-                    source.display_id,
-
-                    appIcon:
-                        source.appIcon &&
-                        !source.appIcon.isEmpty()
-                            ? source.appIcon.toDataURL()
-                            : null
-                })
-            );
-
-        } catch (error) {
-
-            console.error(
-                "Erro listando fontes:",
-                error
-            );
-
-
-            return [];
-        }
-    }
-);
-
-
-// ======================================================
-// THUMBNAILS
-// ======================================================
-
-ipcMain.handle(
-    "screen:get-thumbnails",
-    async (
-        _event,
-        type
-    ) => {
-
-        if (
-            type !==
-            "screen"
-        ) {
-
-            return [];
-        }
-
-
-        try {
-
-            const sources =
-                await desktopCapturer
-                    .getSources({
-                        types: [
-                            "screen"
-                        ],
-
-                        thumbnailSize: {
-                            width:
-                                320,
-
-                            height:
-                                180
-                        },
-
-                        fetchWindowIcons:
-                            false
-                    });
-
-
-            return sources.map(
-                source => ({
-
-                    id:
-                    source.id,
-
-                    thumbnail:
-                        source.thumbnail &&
-                        !source.thumbnail.isEmpty()
-                            ? source.thumbnail.toDataURL()
-                            : null
-                })
-            );
-
-        } catch (error) {
-
-            console.error(
-                "Erro carregando thumbnails:",
-                error
-            );
-
-
-            return [];
-        }
-    }
-);
-
-
-// ======================================================
-// SELECT SOURCE
-// ======================================================
-
-ipcMain.on(
-    "screen:select-source",
-    (
-        _event,
-        options
-    ) => {
-
-        if (
-            !options ||
-            !options.sourceId
-        ) {
-
-            return;
-        }
-
-
-        const sourceId =
-            String(
-                options.sourceId
-            );
-
-
-        const isWindow =
-            sourceId.startsWith(
-                "window:"
-            );
-
-
-        let audioMode =
-            String(
-                options.audioMode ||
-                "none"
-            );
-
-
-        if (
-            audioMode !==
-            "process" &&
-            audioMode !==
-            "loopback" &&
-            audioMode !==
-            "none"
-        ) {
-
-            audioMode =
-                "none";
-        }
-
-
-        if (
-            audioMode ===
-            "process" &&
-            !isWindow
-        ) {
-
-            audioMode =
-                "loopback";
-        }
-
-
-        console.log(
-            "Seleção do picker:",
-            {
-                sourceId,
-                isWindow,
-                audioMode
-            }
-        );
-
-
-        selectedShareOptions = {
-            sourceId,
-            audioMode
-        };
-
-
-        const result = {
-            sourceId,
-            audioMode
-        };
-
-
-        const resolve =
-            pickerResolve;
-
-
-        pickerResolve =
-            null;
-
-
-        pickerReject =
-            null;
-
-
-        if (
-            pickerWindow &&
-            !pickerWindow.isDestroyed()
-        ) {
-
-            pickerWindow.destroy();
-        }
-
-
-        pickerWindow =
-            null;
-
-
-        if (
-            resolve
-        ) {
-
-            resolve(
-                result
-            );
-        }
-    }
-);
-
-
-ipcMain.on(
-    "screen:cancel",
-    () => {
-
-        console.log(
-            "Compartilhamento cancelado."
-        );
-
-
-        cancelPicker();
-    }
-);
-
-
-// ======================================================
-// DISPLAY MEDIA
-// ======================================================
-
-function configureDisplayMediaHandler() {
-
-    session.defaultSession
-        .setDisplayMediaRequestHandler(
-            async (
-                request,
-                callback
-            ) => {
-
-                console.log(
-                    "getDisplayMedia real:",
-                    request.securityOrigin
-                );
-
-
-                if (
-                    !selectedShareOptions
-                ) {
-
-                    console.error(
-                        "getDisplayMedia sem fonte pré-selecionada."
-                    );
-
-
-                    return;
-                }
-
-
-                const selection =
-                    selectedShareOptions;
-
-
-                selectedShareOptions =
-                    null;
-
-
-                console.log(
-                    "Iniciando captura:",
-                    selection
-                );
-
-
-                try {
-
-                    const sources =
-                        await desktopCapturer
-                            .getSources({
-                                types: [
-                                    "screen",
-                                    "window"
-                                ],
-
-                                thumbnailSize: {
-                                    width:
-                                        0,
-
-                                    height:
-                                        0
-                                },
-
-                                fetchWindowIcons:
-                                    false
-                            });
-
-
-                    const source =
-                        sources.find(
-                            item =>
-                                item.id ===
-                                selection.sourceId
-                        );
-
-
-                    if (
-                        !source
-                    ) {
-
-                        console.error(
-                            "Fonte desapareceu:",
-                            selection.sourceId
-                        );
-
-
-                        return;
-                    }
-
-
-                    if (
-                        selection.audioMode ===
-                        "loopback"
-                    ) {
-
-                        console.log(
-                            "Captura:",
-                            source.name
-                        );
-
-
-                        console.log(
-                            "Áudio: LOOPBACK GLOBAL"
-                        );
-
-
-                        callback({
-                            video:
-                            source,
-
-                            audio:
-                                "loopback"
-                        });
-
-
-                        return;
-                    }
-
-
-                    if (
-                        selection.audioMode ===
-                        "process"
-                    ) {
-
-                        console.log(
-                            "Captura:",
-                            source.name
-                        );
-
-
-                        console.log(
-                            "Áudio: PROCESS LOOPBACK"
-                        );
-
-
-                        callback({
-                            video:
-                            source
-                        });
-
-
-                        return;
-                    }
-
-
-                    console.log(
-                        "Captura:",
-                        source.name
-                    );
-
-
-                    console.log(
-                        "Áudio: DESATIVADO"
-                    );
-
-
-                    callback({
-                        video:
-                        source
-                    });
-
-                } catch (error) {
-
-                    console.error(
-                        "Erro iniciando captura:",
-                        error
-                    );
-                }
-            }
-        );
-}
 
 
 // ======================================================
@@ -5468,7 +4940,19 @@ app.whenReady().then(
         configureSharkordApiLogger();
 
 
-        configureDisplayMediaHandler();
+        screenShareManager =
+            setupScreenShareMain({
+                getMainWindow:
+                    () =>
+                        mainWindow,
+
+                getAppIcon,
+
+                applyWindowIcon,
+
+                baseDir:
+                __dirname
+            });
 
 
         createServerWindow();
@@ -5505,10 +4989,51 @@ app.whenReady().then(
 // ======================================================
 
 app.on(
+    "before-quit",
+    () => {
+
+        /*
+         * Esta flag é essencial: quando app.quit() tenta fechar
+         * a mainWindow, o handler "close" deve deixar a janela
+         * fechar normalmente em vez de chamar preventDefault().
+         */
+        appIsQuitting =
+            true;
+
+
+        cleanupBeforeExit(
+            "before-quit"
+        );
+    }
+);
+
+
+app.on(
     "will-quit",
     () => {
 
-        stopProcessAudio();
+        cleanupBeforeExit(
+            "will-quit"
+        );
+
+
+        if (
+            forceExitTimer
+        ) {
+
+            clearTimeout(
+                forceExitTimer
+            );
+
+
+            forceExitTimer =
+                null;
+        }
+
+
+        console.log(
+            "[Shutdown] Electron finalizando normalmente."
+        );
     }
 );
 
@@ -5522,7 +5047,9 @@ app.on(
             "darwin"
         ) {
 
-            app.quit();
+            requestAppShutdown(
+                "todas as janelas foram fechadas"
+            );
         }
     }
 );
