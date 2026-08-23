@@ -41,7 +41,7 @@ function setupScreenShareMain({
 
 
     console.log(
-        "[ScreenShare Main] módulo V2.2 inicializado."
+        "[ScreenShare Main] módulo V2.3 inicializado."
     );
 
 
