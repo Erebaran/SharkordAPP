@@ -42,6 +42,10 @@ const {
         "sharkord-desktop-update-button";
 
 
+    const ACTIVE_CONTAINER_CLASS =
+        "sharkord-update-content-active";
+
+
     let updaterState =
         null;
 
@@ -79,6 +83,10 @@ const {
 
 
     let panelVisible =
+        false;
+
+
+    let nativeTabGuardInstalled =
         false;
 
 
@@ -172,17 +180,40 @@ const {
                ========================================= */
 
             #${PANEL_ID} {
+                display:
+                    block;
+
                 width:
                     100%;
 
+                min-width:
+                    0;
+
+                max-width:
+                    none;
+
                 box-sizing:
                     border-box;
+
+                margin:
+                    0;
 
                 color:
                     inherit;
 
                 font-family:
                     inherit;
+            }
+
+
+            /*
+             * Enquanto Update estiver ativo, TODO conteúdo nativo
+             * do mesmo container é ocultado via CSS. Isso também
+             * cobre elementos que o React recriar depois do clique.
+             */
+            .${ACTIVE_CONTAINER_CLASS} > :not(#${PANEL_ID}) {
+                display:
+                    none !important;
             }
 
 
@@ -426,6 +457,9 @@ const {
                 margin-top:
                     4px;
 
+                min-width:
+                    0;
+
                 color:
                     #9e9e9e;
 
@@ -434,6 +468,12 @@ const {
 
                 line-height:
                     1.45;
+
+                overflow-wrap:
+                    anywhere;
+
+                word-break:
+                    break-word;
             }
 
 
@@ -1017,16 +1057,20 @@ const {
                     parent.getBoundingClientRect();
 
 
+                /*
+                 * O bug visual vinha daqui: usávamos a largura do
+                 * filho interno (bestRect), mas montávamos o Update
+                 * dentro do wrapper maior. Isso deixava uma faixa do
+                 * conteúdo antigo aparecendo à direita.
+                 *
+                 * O Update agora ocupa o wrapper inteiro.
+                 */
                 settingsContentWidth =
-                    bestRect.width;
+                    parentRect.width;
 
 
                 settingsContentOffsetLeft =
-                    Math.max(
-                        0,
-                        bestRect.left -
-                        parentRect.left
-                    );
+                    0;
 
 
                 return parent;
@@ -1813,6 +1857,16 @@ const {
             createPanel();
 
 
+        /*
+         * A classe é a parte importante: se o React inserir ou
+         * recriar conteúdo enquanto Update estiver aberto, o novo
+         * conteúdo também fica oculto automaticamente.
+         */
+        settingsContentContainer.classList.add(
+            ACTIVE_CONTAINER_CLASS
+        );
+
+
         for (
             const child
             of Array.from(
@@ -1836,36 +1890,95 @@ const {
                 display:
                 child.style.display
             });
-
-
-            child.style.display =
-                "none";
         }
     }
 
 
     function restoreNativeSettingsContent() {
 
+        if (
+            settingsContentContainer
+        ) {
+
+            settingsContentContainer.classList.remove(
+                ACTIVE_CONTAINER_CLASS
+            );
+        }
+
+
+        /*
+         * Não precisamos forçar display nos elementos porque a
+         * ocultação agora é feita pela classe CSS. Mantemos este
+         * array apenas para compatibilidade com versões anteriores.
+         */
+        hiddenNativeContent =
+            [];
+    }
+
+
+    // ==================================================
+    // LIMPAR HIGHLIGHT DAS ABAS NATIVAS
+    // ==================================================
+
+    function clearNativeTabHighlight() {
+
+        if (
+            !settingsTabsContainer
+        ) {
+
+            return;
+        }
+
+
+        const tabs =
+            settingsTabsContainer.querySelectorAll(
+                "button, [role='tab'], [role='button'], a"
+            );
+
+
         for (
-            const item
-            of hiddenNativeContent
+            const tab
+            of tabs
             ) {
 
             if (
-                !item.element
+                tab.id === TAB_ID
             ) {
 
                 continue;
             }
 
 
-            item.element.style.display =
-                item.display;
+            /*
+             * O Sharkord usa esses atributos para marcar a aba
+             * selecionada. Ao abrir Update precisamos desligar
+             * visualmente a aba nativa anterior.
+             */
+            if (
+                tab.hasAttribute(
+                    "data-state"
+                )
+            ) {
+
+                tab.setAttribute(
+                    "data-state",
+                    "inactive"
+                );
+            }
+
+
+            if (
+                tab.hasAttribute(
+                    "aria-selected"
+                )
+            ) {
+
+                tab.setAttribute(
+                    "aria-selected",
+                    "false"
+                );
+            }
         }
-
-
-        hiddenNativeContent =
-            [];
     }
 
 
@@ -1875,18 +1988,28 @@ const {
 
     async function showUpdatePanel() {
 
+        /*
+         * Profile / Others / Notifications podem fazer o React
+         * substituir completamente o container de conteúdo.
+         * Portanto, ao clicar em Update nunca confiamos apenas
+         * na referência antiga: detectamos novamente a área atual.
+         */
+        const currentContentContainer =
+            findSettingsContentContainer();
+
+
         if (
-            !settingsContentContainer ||
-            !settingsContentContainer.isConnected
+            currentContentContainer
         ) {
 
             settingsContentContainer =
-                findSettingsContentContainer();
+                currentContentContainer;
         }
 
 
         if (
-            !settingsContentContainer
+            !settingsContentContainer ||
+            !settingsContentContainer.isConnected
         ) {
 
             console.warn(
@@ -1917,27 +2040,20 @@ const {
 
 
         /*
-         * Replica a largura e o alinhamento horizontal
-         * do conteúdo nativo detectado antes de ocultá-lo.
+         * O painel deve substituir visualmente a área inteira de
+         * conteúdo das Settings. Nunca usamos a largura de um card
+         * interno, pois isso deixava o container antigo visível.
          */
-        if (
-            settingsContentWidth &&
-            settingsContentWidth >
-            0
-        ) {
+        panel.style.width =
+            "100%";
 
-            panel.style.width =
-                `${Math.round(settingsContentWidth)}px`;
 
-        } else {
-
-            panel.style.width =
-                "100%";
-        }
+        panel.style.maxWidth =
+            "none";
 
 
         panel.style.marginLeft =
-            `${Math.round(settingsContentOffsetLeft)}px`;
+            "0";
 
 
         panel.style.marginRight =
@@ -1953,6 +2069,9 @@ const {
 
         panel.hidden =
             false;
+
+
+        clearNativeTabHighlight();
 
 
         if (
@@ -2041,6 +2160,95 @@ const {
 
 
     // ==================================================
+    // GUARD GLOBAL PARA ABAS NATIVAS
+    // ==================================================
+
+    function installNativeTabGuard() {
+
+        if (
+            nativeTabGuardInstalled
+        ) {
+
+            return;
+        }
+
+
+        nativeTabGuardInstalled =
+            true;
+
+
+        /*
+         * O Sharkord/React recria os botões de Settings ao trocar
+         * entre Others, Notifications etc. Listeners adicionados
+         * diretamente nesses botões se perdiam.
+         *
+         * Este listener em capture fica no document e continua
+         * funcionando mesmo depois de qualquer rerender.
+         */
+        document.addEventListener(
+            "click",
+            event => {
+
+                if (
+                    !panelVisible
+                ) {
+
+                    return;
+                }
+
+
+                const target =
+                    event.target instanceof Element
+                        ? event.target
+                        : null;
+
+
+                if (
+                    !target
+                ) {
+
+                    return;
+                }
+
+
+                const clickedTab =
+                    target.closest(
+                        "button, [role='tab'], [role='button'], a"
+                    );
+
+
+                if (
+                    !clickedTab ||
+                    clickedTab.id === TAB_ID ||
+                    clickedTab.closest(`#${PANEL_ID}`)
+                ) {
+
+                    return;
+                }
+
+
+                const info =
+                    findSettingsTabs();
+
+
+                if (
+                    !info?.container ||
+                    !info.container.contains(clickedTab)
+                ) {
+
+                    return;
+                }
+
+
+                hideUpdatePanel();
+
+            },
+            true
+        );
+    }
+
+
+    // ==================================================
     // CRIAR ABA UPDATE
     // ==================================================
 
@@ -2073,6 +2281,14 @@ const {
 
             updateTab =
                 existing;
+
+
+            /*
+             * A barra também pode ter sido rerenderizada.
+             * Mantemos sempre a referência do container atual.
+             */
+            settingsTabsContainer =
+                info.container;
 
 
             return true;
@@ -2234,52 +2450,83 @@ const {
          * ainda está visível. Isso deixa o clique em
          * Update independente de qualquer rerender.
          */
-        const detectedContent =
-            findSettingsContentContainer(
-                info
-            );
-
-
         if (
-            detectedContent
+            !panelVisible
         ) {
 
-            settingsContentContainer =
-                detectedContent;
+            const detectedContent =
+                findSettingsContentContainer(
+                    info
+                );
+
+
+            if (
+                detectedContent
+            ) {
+
+                settingsContentContainer =
+                    detectedContent;
+            }
         }
 
 
         createUpdateTab(
             info
         );
+
+
+        /*
+         * Se o React rerenderizar a área enquanto Update estiver
+         * aberto, reafirma a classe que mantém o conteúdo nativo
+         * escondido.
+         */
+        if (
+            panelVisible &&
+            settingsContentContainer
+        ) {
+
+            settingsContentContainer.classList.add(
+                ACTIVE_CONTAINER_CLASS
+            );
+        }
     }
 
 
     function scheduleScan() {
 
+        /*
+         * Não usa setTimeout aqui.
+         *
+         * O atraso de 60 ms fazia o Sharkord renderizar primeiro
+         * as abas nativas e somente depois inserir "Update",
+         * causando o pop-in visível.
+         *
+         * MutationObserver já executa antes do próximo paint.
+         * A microtask apenas agrupa mutações consecutivas sem
+         * empurrar a criação da aba para um frame posterior.
+         */
         if (
             observerTimer
         ) {
 
-            clearTimeout(
-                observerTimer
-            );
+            return;
         }
 
 
         observerTimer =
-            setTimeout(
-                () => {
-
-                    observerTimer =
-                        null;
+            true;
 
 
-                    scanUserSettings();
+        queueMicrotask(
+            () => {
 
-                },
-                60
-            );
+                observerTimer =
+                    null;
+
+
+                scanUserSettings();
+            }
+        );
     }
 
 
@@ -2308,6 +2555,8 @@ const {
     function init() {
 
         installStyle();
+
+        installNativeTabGuard();
 
         removeOldUpdateButton();
 
@@ -2353,3 +2602,4 @@ const {
     }
 
 })();
+
