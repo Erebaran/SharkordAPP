@@ -2777,6 +2777,14 @@ function createMainWindow() {
                         "main-preload.js"
                     ),
 
+                /*
+                 * Screen share usa video/canvas no renderer.
+                 * Impede o Chromium de reduzir timers/video quando
+                 * o Sharkord fica em segundo plano durante o jogo.
+                 */
+                backgroundThrottling:
+                    false,
+
                 nodeIntegration:
                     false,
 

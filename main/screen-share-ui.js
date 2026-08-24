@@ -86,13 +86,61 @@ function installScreenShareUi(mainWindow) {
     }
 
     function isRedButton(button) {
-        const color = rgb(getComputedStyle(button).backgroundColor);
-        return Boolean(
-            color &&
-            color.r >= 170 &&
-            color.r > color.g * 1.45 &&
-            color.r > color.b * 1.25
-        );
+        if (!button) {
+            return false;
+        }
+
+        // UI atual do Sharkord: detecta primeiro pelas classes do botão Disconnect.
+        // Isso evita depender do formato retornado por getComputedStyle()
+        // (rgb, oklch, etc.).
+        const className = String(
+            button.getAttribute?.("class") ||
+            button.className ||
+            ""
+        ).toLowerCase();
+
+        if (
+            className.includes("bg-[#ec4245]") ||
+            className.includes("hover:bg-[#da373c]") ||
+            className.includes("bg-red-")
+        ) {
+            return true;
+        }
+
+        // Fallback semântico.
+        const description = [
+            button.getAttribute?.("aria-label"),
+            button.getAttribute?.("title"),
+            button.getAttribute?.("data-tooltip-content"),
+            button.textContent
+        ]
+            .filter(Boolean)
+            .join(" ")
+            .toLowerCase();
+
+        if (
+            description.includes("disconnect") ||
+            description.includes("hang up") ||
+            description.includes("end call") ||
+            description.includes("desconectar") ||
+            description.includes("encerrar chamada")
+        ) {
+            return true;
+        }
+
+        // Compatibilidade com a UI antiga que retornava RGB.
+        try {
+            const color = rgb(getComputedStyle(button).backgroundColor);
+
+            return Boolean(
+                color &&
+                color.r >= 145 &&
+                color.r > color.g * 1.30 &&
+                color.r > color.b * 1.15
+            );
+        } catch {
+            return false;
+        }
     }
 
     function smallButtons(root) {
