@@ -1,6 +1,6 @@
 {
   "name": "sharkord-desktop",
-  "version": "1.0.5",
+  "version": "1.0.7",
   "description": "Sharkord Desktop",
   "main": "main.js",
   "scripts": {
@@ -18,6 +18,7 @@
   "build": {
     "appId": "com.sharkord.desktop",
     "productName": "Sharkord Desktop",
+    "artifactName": "Sharkord-Desktop-Setup-${version}.${ext}",
     "asar": true,
     "win": {
       "target": "nsis",
