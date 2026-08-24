@@ -2706,25 +2706,96 @@ contextBridge.executeInMainWorld({
         );
 
 
-        const codecUiObserver =
-            new MutationObserver(
-                scheduleCodecUiScan
+        let codecUiObserver =
+            null;
+
+
+        let codecUiObserverStartTimer =
+            null;
+
+
+        function startCodecUiObserver() {
+
+            if (
+                codecUiObserver
+            ) {
+
+                return;
+            }
+
+
+            const root =
+                document.documentElement;
+
+
+            /*
+             * O preload pode executar antes de o Chromium criar
+             * document.documentElement. MutationObserver.observe()
+             * exige um Node real e lançava TypeError aqui, abortando
+             * o restante do screen-share-main-world.js.
+             *
+             * Sem chegar ao fim deste arquivo, o patch de
+             * getDisplayMedia e os botões "Trocar tela" nunca eram
+             * instalados.
+             */
+            if (
+                !root
+            ) {
+
+                if (
+                    codecUiObserverStartTimer
+                ) {
+
+                    return;
+                }
+
+
+                codecUiObserverStartTimer =
+                    setTimeout(
+                        () => {
+
+                            codecUiObserverStartTimer =
+                                null;
+
+
+                            startCodecUiObserver();
+                        },
+                        50
+                    );
+
+
+                return;
+            }
+
+
+            codecUiObserver =
+                new MutationObserver(
+                    scheduleCodecUiScan
+                );
+
+
+            codecUiObserver.observe(
+                root,
+                {
+                    childList:
+                        true,
+
+                    subtree:
+                        true
+                }
             );
 
 
-        codecUiObserver.observe(
-            document.documentElement,
-            {
-                childList:
-                    true,
-
-                subtree:
-                    true
-            }
-        );
+            scheduleCodecUiScan();
 
 
-        scheduleCodecUiScan();
+            console.log(
+                "[Audio Codec UI] observer iniciado."
+            );
+        }
+
+
+        startCodecUiObserver();
 
 
         // ==================================================
@@ -6503,11 +6574,6 @@ contextBridge.executeInMainWorld({
 
         function installSwitchButtons() {
 
-            removeSwitchButtons();
-
-            return false;
-
-
             const session =
                 currentSession;
 
@@ -6705,9 +6771,6 @@ contextBridge.executeInMainWorld({
 
         setInterval(
             () => {
-
-                return;
-
 
                 const session =
                     currentSession;
@@ -7247,7 +7310,7 @@ contextBridge.executeInMainWorld({
 
 
         console.log(
-            "[ScreenShare] v12.3 UI STOP FIX + FAST START + AUDIO SWITCH FIX + dois botões à esquerda do PARAR + JSON Flight Recorder instalado."
+            "[ScreenShare] v12.3.1 PRELOAD SAFE + UI dual + FAST START + AUDIO SWITCH FIX instalado."
         );
 
     }

@@ -10,9 +10,9 @@ function installScreenShareUi(mainWindow) {
 
         const code = String.raw`
 (() => {
-    const PATCH = "__sharkordScreenShareUiClean";
-    const CALL_ID = "__sharkord_switch_call_clean";
-    const VOICE_ID = "__sharkord_switch_voice_clean";
+    const PATCH = "__sharkordScreenShareUiLeanDual";
+    const CALL_ID = "__sharkord_switch_call_lean_dual";
+    const VOICE_ID = "__sharkord_switch_voice_lean_dual";
     const STATE_EVENT = "__sharkordLocalScreenShareState";
 
     if (window[PATCH]) {
@@ -85,14 +85,121 @@ function installScreenShareUi(mainWindow) {
             : null;
     }
 
+    function buttonDescription(button) {
+        return String(
+            [
+                button?.getAttribute?.("aria-label"),
+                button?.getAttribute?.("title"),
+                button?.getAttribute?.("data-tooltip-content"),
+                button?.textContent
+            ]
+                .filter(Boolean)
+                .join(" ")
+        ).toLowerCase();
+    }
+
     function isRedButton(button) {
-        const color = rgb(getComputedStyle(button).backgroundColor);
-        return Boolean(
-            color &&
-            color.r >= 170 &&
-            color.r > color.g * 1.45 &&
-            color.r > color.b * 1.25
-        );
+        if (!button) {
+            return false;
+        }
+
+        const className = String(
+            button.getAttribute?.("class") ||
+            button.className ||
+            ""
+        ).toLowerCase();
+
+        const description = buttonDescription(button);
+
+        // UI atual do Sharkord.
+        if (
+            className.includes("bg-[#ec4245]") ||
+            className.includes("hover:bg-[#da373c]") ||
+            className.includes("bg-red-")
+        ) {
+            return true;
+        }
+
+        // Fallback semântico.
+        if (
+            description.includes("disconnect") ||
+            description.includes("hang up") ||
+            description.includes("end call") ||
+            description.includes("desconectar") ||
+            description.includes("encerrar chamada")
+        ) {
+            return true;
+        }
+
+        // Compatibilidade com a UI antiga.
+        try {
+            const color = rgb(getComputedStyle(button).backgroundColor);
+
+            return Boolean(
+                color &&
+                color.r >= 145 &&
+                color.r > color.g * 1.30 &&
+                color.r > color.b * 1.15
+            );
+        } catch {
+            return false;
+        }
+    }
+
+    function isActiveScreenShareButton(button) {
+        if (!button || !visible(button)) {
+            return false;
+        }
+
+        const description = buttonDescription(button);
+        const className = String(
+            button.getAttribute?.("class") ||
+            button.className ||
+            ""
+        ).toLowerCase();
+
+        const pressed = String(
+            button.getAttribute?.("aria-pressed") || ""
+        ).toLowerCase();
+
+        const state = String(
+            button.getAttribute?.("data-state") || ""
+        ).toLowerCase();
+
+        if (pressed === "true") {
+            return true;
+        }
+
+        if (
+            state === "active" ||
+            state === "on" ||
+            state === "checked"
+        ) {
+            return true;
+        }
+
+        if (
+            description.includes("stop sharing") ||
+            description.includes("stop share") ||
+            description.includes("stop screen") ||
+            description.includes("parar compartilhamento") ||
+            description.includes("parar transmiss") ||
+            description.includes("encerrar compartilhamento")
+        ) {
+            return true;
+        }
+
+        // Classes do ControlToggleButton atual.
+        if (
+            className.includes("bg-blue-500/20") ||
+            className.includes("hover:bg-blue-500/30") ||
+            className.includes("bg-blue-500/15") ||
+            className.includes("hover:bg-blue-500/25")
+        ) {
+            return true;
+        }
+
+        return false;
     }
 
     function smallButtons(root) {
@@ -161,8 +268,9 @@ function installScreenShareUi(mainWindow) {
 
             const index = buttons.findIndex(({ button }) => button === hangup);
 
-            // mic, camera, tela, encerrar
-            if (index >= 3) {
+            // screen precisa apenas de um template à esquerda.
+            // Funciona com 3 ou 4 controles na barra.
+            if (index >= 2) {
                 return {
                     screen: buttons[index - 1].button,
                     template: buttons[index - 2].button
@@ -253,7 +361,23 @@ function installScreenShareUi(mainWindow) {
     // --------------------------------------------------
 
     function isSharing() {
-        return window.__sharkordLocalScreenShareActive === true;
+        // Estado real publicado pelo main/preload.
+        if (window.__sharkordLocalScreenShareActive === true) {
+            return true;
+        }
+
+        // Fallback visual: evita perder os botões quando o frontend
+        // remonta a barra antes/depois do evento de estado.
+        const call = findCallControls();
+        if (call?.screen && isActiveScreenShareButton(call.screen)) {
+            return true;
+        }
+
+        const voice = findVoiceControls();
+        return Boolean(
+            voice?.screen &&
+            isActiveScreenShareButton(voice.screen)
+        );
     }
 
     function setSharing(active) {
@@ -368,17 +492,21 @@ function installScreenShareUi(mainWindow) {
         fixLeftScreenIcon();
 
         const call = findCallControls();
+        const voice = findVoiceControls();
+
         if (call) {
             bindNativeStop(call.screen);
         }
 
-        if (!isSharing() || !call || switching) {
+        if (!isSharing() || switching) {
             removeSwitches();
             return;
         }
 
+        // Cada botão é instalado de forma independente.
+        // Se uma barra estiver sendo remontada, a outra continua existindo.
         installSwitch(call, CALL_ID);
-        installSwitch(findVoiceControls(), VOICE_ID);
+        installSwitch(voice, VOICE_ID);
     }
 
     // --------------------------------------------------
@@ -474,9 +602,9 @@ function installScreenShareUi(mainWindow) {
                 throw new Error("screen share não reiniciou");
             }
 
-            console.log("[ScreenShare UI Clean] fonte trocada.");
+            console.log("[ScreenShare UI Lean Dual] fonte trocada.");
         } catch (error) {
-            console.error("[ScreenShare UI Clean] falha ao trocar fonte:", error);
+            console.error("[ScreenShare UI Lean Dual] falha ao trocar fonte:", error);
         } finally {
             switching = false;
             refresh();
@@ -503,14 +631,14 @@ function installScreenShareUi(mainWindow) {
     setInterval(refresh, 1000);
     refresh();
 
-    console.log("[ScreenShare UI Clean] instalado.");
+    console.log("[ScreenShare UI Lean Dual] instalado.");
 })();
 `;
 
         try {
             await mainWindow.webContents.executeJavaScript(code, true);
         } catch (error) {
-            console.error("[ScreenShare UI Clean] falha ao injetar:", error);
+            console.error("[ScreenShare UI Lean Dual] falha ao injetar:", error);
         }
     };
 

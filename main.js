@@ -19,13 +19,6 @@ const {
 );
 
 
-const {
-    installScreenShareUi
-} = require(
-    "./main/screen-share-ui"
-);
-
-
 const fs =
     require("fs");
 
@@ -2745,6 +2738,25 @@ function createMainWindow() {
         getAppIcon();
 
 
+    const mainPreloadPath =
+        path.join(
+            __dirname,
+            "main-preload.js"
+        );
+
+
+    if (
+        !fs.existsSync(
+            mainPreloadPath
+        )
+    ) {
+
+        throw new Error(
+            `main-preload.js não encontrado: ${mainPreloadPath}`
+        );
+    }
+
+
     mainWindow =
         new BrowserWindow({
             width:
@@ -2772,10 +2784,15 @@ function createMainWindow() {
             webPreferences: {
 
                 preload:
-                    path.join(
-                        __dirname,
-                        "main-preload.js"
-                    ),
+                    mainPreloadPath,
+
+                /*
+                 * Screen share usa video/canvas no renderer.
+                 * Impede o Chromium de reduzir timers/video quando
+                 * o Sharkord fica em segundo plano durante o jogo.
+                 */
+                backgroundThrottling:
+                    false,
 
                 nodeIntegration:
                     false,
@@ -2783,8 +2800,16 @@ function createMainWindow() {
                 contextIsolation:
                     true,
 
+                /*
+                 * main-preload.js é um bootstrap modular e usa require()
+                 * para carregar ./preload/*.js. Preloads sandboxed não
+                 * podem resolver módulos locais do projeto.
+                 *
+                 * Segurança continua com nodeIntegration:false e
+                 * contextIsolation:true.
+                 */
                 sandbox:
-                    true
+                    false
             }
         });
 
@@ -2795,11 +2820,6 @@ function createMainWindow() {
 
 
     attachSharkordWebSocketLogger(
-        mainWindow
-    );
-
-
-    installScreenShareUi(
         mainWindow
     );
 
@@ -3219,7 +3239,6 @@ function configureSharkordApiLogger() {
             const isNetworkDataRequest =
                 resourceType === "xhr" ||
                 resourceType === "fetch" ||
-                resourceType === "websocket" ||
                 resourceType === "websocket";
 
 
@@ -3364,8 +3383,10 @@ function configureSharkordApiLogger() {
 
                                 console.log(
                                     "[Sharkord API BODY]",
-                                    bodies.join(
-                                        "\n"
+                                    redactSensitiveWebSocketData(
+                                        bodies.join(
+                                            "\n"
+                                        )
                                     )
                                 );
                             }

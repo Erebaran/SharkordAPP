@@ -1,10 +1,43 @@
 // Sharkord Desktop — preload principal
 //
-// Este arquivo deve permanecer pequeno.
+// Bootstrap modular e resiliente.
 // Cada responsabilidade vive em seu próprio módulo.
+// Um erro isolado não deve impedir os outros módulos de carregar.
 
-require("./preload/updater-api");
-require("./preload/screen-share-api");
-require("./preload/process-audio-api");
-require("./preload/voice-admin-main-world");
-require("./preload/screen-share-main-world");
+const modules = [
+    {
+        name: "Updater API",
+        path: "./preload/updater-api"
+    },
+    {
+        name: "ScreenShare API",
+        path: "./preload/screen-share-api"
+    },
+    {
+        name: "Process Audio API",
+        path: "./preload/process-audio-api"
+    },
+    {
+        name: "Voice Admin",
+        path: "./preload/voice-admin-main-world"
+    },
+    {
+        name: "ScreenShare Main World",
+        path: "./preload/screen-share-main-world"
+    }
+];
+
+for (const moduleEntry of modules) {
+    try {
+        require(moduleEntry.path);
+
+        console.log(
+            `[Main Preload] ${moduleEntry.name} carregado.`
+        );
+    } catch (error) {
+        console.error(
+            `[Main Preload] falha carregando ${moduleEntry.name}:`,
+            error
+        );
+    }
+}
