@@ -2412,7 +2412,7 @@ contextBridge.executeInMainWorld({
                 negotiated.textContent =
                     lastNegotiatedAudioCodec
                         ? lastNegotiatedAudioCodec
-                        : "Ainda não negociado";
+                        : "Not negotiated yet";
             }
         }
 
@@ -2510,12 +2510,10 @@ contextBridge.executeInMainWorld({
                         "
                     >
                         <option value="auto">
-                            Automático
-                        </option>
+                            Automatic</option>
 
                         <option value="opus">
-                            Opus
-                        </option>
+                            Opus</option>
                     </select>
                 </div>
 
@@ -2548,8 +2546,7 @@ contextBridge.executeInMainWorld({
                             text-align:right;
                         "
                     >
-                        Ainda não negociado
-                    </strong>
+                        Not negotiated yet</strong>
                 </div>
             `;
 
@@ -2795,7 +2792,10 @@ contextBridge.executeInMainWorld({
         }
 
 
-        startCodecUiObserver();
+        // FIX:
+        // O observer global do painel de codec interferia no User Settings.
+        // Mantemos todo o restante do screen-share-main-world intacto.
+        console.log("[ScreenShare] Codec UI observer global desabilitado.");
 
 
         // ==================================================
@@ -3107,7 +3107,7 @@ contextBridge.executeInMainWorld({
 
 
                     logData(
-                        "[Audio] Codec negociado",
+                        "Not negotiated yet",
                         {
                             reason,
                             negotiated
@@ -3118,7 +3118,7 @@ contextBridge.executeInMainWorld({
             } catch (caughtError) {
 
                 warnData(
-                    "[Audio] Falha ao ler codec negociado",
+                    "Not negotiated yet",
                     {
                         reason,
 
@@ -5977,6 +5977,15 @@ contextBridge.executeInMainWorld({
         }
 
 
+        // SCREEN SHARE REACT BRIDGE V9.0
+        Reflect.set(
+            window,
+            "__sharkordSwitchScreenShareSource",
+            () => switchShareSource()
+        );
+
+        removeSwitchButtons();
+
         // ==================================================
         // AÇÃO COMUM
         // ==================================================
@@ -6239,6 +6248,9 @@ contextBridge.executeInMainWorld({
         // ==================================================
 
         function installVoicePanelSwitchButton() {
+            // REACT OWNS VOICE SWITCH BUTTON V9.0
+            return false;
+
 
             const session =
                 currentSession;
@@ -6413,6 +6425,9 @@ contextBridge.executeInMainWorld({
         // ==================================================
 
         function installCallBarSwitchButton() {
+            // REACT OWNS CALL SWITCH BUTTON V9.0
+            return false;
+
 
             const session =
                 currentSession;

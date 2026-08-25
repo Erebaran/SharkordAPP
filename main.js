@@ -1,6 +1,7 @@
 const {
     app,
     BrowserWindow,
+    desktopCapturer,
     session,
     ipcMain,
     dialog,
@@ -10,13 +11,6 @@ const {
 
 const path =
     require("path");
-
-
-const {
-    setupScreenShareMain
-} = require(
-    "./main/screen-share"
-);
 
 
 const fs =
@@ -29,6 +23,10 @@ const http =
 
 const https =
     require("https");
+
+
+const crypto =
+    require("crypto");
 
 
 const {
@@ -56,23 +54,19 @@ let mainWindow =
     null;
 
 
-let screenShareManager =
+let pickerWindow =
     null;
 
 
-// ======================================================
-// APP SHUTDOWN
-// ======================================================
-
-let appIsQuitting =
-    false;
+let pickerResolve =
+    null;
 
 
-let shutdownCleanupDone =
-    false;
+let pickerReject =
+    null;
 
 
-let forceExitTimer =
+let selectedShareOptions =
     null;
 
 
@@ -96,90 +90,6 @@ let updaterConfigured =
     false;
 
 
-let updaterInstalling =
-    false;
-
-
-let updaterState = {
-
-    status:
-        "idle",
-
-    currentVersion:
-        null,
-
-    availableVersion:
-        null,
-
-    percent:
-        0,
-
-    transferred:
-        0,
-
-    total:
-        0,
-
-    bytesPerSecond:
-        0,
-
-    error:
-        null
-};
-
-
-function getUpdaterState() {
-
-    return {
-        ...updaterState,
-
-        currentVersion:
-            app.getVersion(),
-
-        packaged:
-        app.isPackaged
-    };
-}
-
-
-function sendUpdaterState() {
-
-    updaterState.currentVersion =
-        app.getVersion();
-
-
-    if (
-        mainWindow &&
-        !mainWindow.isDestroyed()
-    ) {
-
-        mainWindow
-            .webContents
-            .send(
-                "updater:state",
-                getUpdaterState()
-            );
-    }
-}
-
-
-function setUpdaterState(
-    patch
-) {
-
-    updaterState = {
-        ...updaterState,
-        ...patch,
-
-        currentVersion:
-            app.getVersion()
-    };
-
-
-    sendUpdaterState();
-}
-
-
 function configureAutoUpdater() {
 
     if (
@@ -194,16 +104,15 @@ function configureAutoUpdater() {
         true;
 
 
-    updaterState.currentVersion =
-        app.getVersion();
-
-
     /*
-     * O electron-updater só funciona de verdade
-     * quando o aplicativo está empacotado.
+     * Em desenvolvimento:
      *
-     * Em npm.cmd start deixamos o estado visível
-     * como "development" para a interface.
+     * npm.cmd start
+     *
+     * não fazemos consulta de atualização.
+     *
+     * Auto-update deve ser testado com
+     * a versão instalada pelo NSIS.
      */
     if (
         !app.isPackaged
@@ -214,33 +123,21 @@ function configureAutoUpdater() {
         );
 
 
-        setUpdaterState({
-            status:
-                "development",
-
-            error:
-                null
-        });
-
-
         return;
     }
 
 
-    /*
-     * A atualização agora é controlada pela UI:
-     *
-     * 1. verifica;
-     * 2. informa que existe nova versão;
-     * 3. usuário manda baixar;
-     * 4. usuário manda reiniciar/instalar.
-     */
     autoUpdater.autoDownload =
         false;
 
 
+    /*
+     * Na versão estável atual do
+     * electron-updater, o comportamento padrão
+     * é instalar a atualização ao sair do app.
+     */
     autoUpdater.autoInstallOnAppQuit =
-        false;
+        true;
 
 
     autoUpdater.on(
@@ -250,30 +147,6 @@ function configureAutoUpdater() {
             console.log(
                 "[Updater] procurando atualização..."
             );
-
-
-            setUpdaterState({
-                status:
-                    "checking",
-
-                availableVersion:
-                    null,
-
-                percent:
-                    0,
-
-                transferred:
-                    0,
-
-                total:
-                    0,
-
-                bytesPerSecond:
-                    0,
-
-                error:
-                    null
-            });
         }
     );
 
@@ -292,31 +165,6 @@ function configureAutoUpdater() {
                     info.version
                 }
             );
-
-
-            setUpdaterState({
-                status:
-                    "available",
-
-                availableVersion:
-                    info.version ||
-                    null,
-
-                percent:
-                    0,
-
-                transferred:
-                    0,
-
-                total:
-                    0,
-
-                bytesPerSecond:
-                    0,
-
-                error:
-                    null
-            });
         }
     );
 
@@ -335,30 +183,6 @@ function configureAutoUpdater() {
                     info.version
                 }
             );
-
-
-            setUpdaterState({
-                status:
-                    "up-to-date",
-
-                availableVersion:
-                    null,
-
-                percent:
-                    0,
-
-                transferred:
-                    0,
-
-                total:
-                    0,
-
-                bytesPerSecond:
-                    0,
-
-                error:
-                    null
-            });
         }
     );
 
@@ -367,45 +191,9 @@ function configureAutoUpdater() {
         "download-progress",
         progress => {
 
-            const percent =
-                Number(
-                    progress.percent ||
-                    0
-                );
-
-
             console.log(
-                `[Updater] download: ${percent.toFixed(1)}%`
+                `[Updater] download: ${progress.percent.toFixed(1)}%`
             );
-
-
-            setUpdaterState({
-                status:
-                    "downloading",
-
-                percent,
-
-                transferred:
-                    Number(
-                        progress.transferred ||
-                        0
-                    ),
-
-                total:
-                    Number(
-                        progress.total ||
-                        0
-                    ),
-
-                bytesPerSecond:
-                    Number(
-                        progress.bytesPerSecond ||
-                        0
-                    ),
-
-                error:
-                    null
-            });
         }
     );
 
@@ -415,25 +203,14 @@ function configureAutoUpdater() {
         info => {
 
             console.log(
-                "[Updater] atualização pronta para instalar:",
+                "[Updater] atualização baixada:",
                 info.version
             );
 
 
-            setUpdaterState({
-                status:
-                    "downloaded",
-
-                availableVersion:
-                    info.version ||
-                    updaterState.availableVersion,
-
-                percent:
-                    100,
-
-                error:
-                    null
-            });
+            console.log(
+                "[Updater] será instalada quando o Sharkord Desktop for fechado."
+            );
         }
     );
 
@@ -446,25 +223,15 @@ function configureAutoUpdater() {
                 "[Updater] erro:",
                 error
             );
-
-
-            setUpdaterState({
-                status:
-                    "error",
-
-                error:
-                    error?.message ||
-                    String(
-                        error
-                    )
-            });
         }
     );
 
 
     /*
-     * Continua verificando automaticamente ao abrir,
-     * mas não baixa nada sem autorização do usuário.
+     * Espera alguns segundos após abrir.
+     *
+     * Assim a atualização não compete com
+     * carregamento inicial / login / WebRTC.
      */
     setTimeout(
         () => {
@@ -475,7 +242,7 @@ function configureAutoUpdater() {
 
 
             autoUpdater
-                .checkForUpdates()
+                .checkForUpdatesAndNotify()
                 .catch(
                     error => {
 
@@ -492,16 +259,65 @@ function configureAutoUpdater() {
 }
 
 
-// ======================================================
-// IPC AUTO UPDATE
-// ======================================================
+
+// SHARKORD REACT UPDATER IPC V7.5
+
+let updaterUiState = {
+    status: app.isPackaged ? "idle" : "development",
+    currentVersion: app.getVersion(),
+    availableVersion: null,
+    progress: 0,
+    error: null,
+    packaged: app.isPackaged
+};
+
+
+function emitUpdaterUiState() {
+
+    updaterUiState = {
+        ...updaterUiState,
+        currentVersion: app.getVersion(),
+        packaged: app.isPackaged
+    };
+
+
+    if (
+        mainWindow &&
+        !mainWindow.isDestroyed()
+    ) {
+
+        mainWindow.webContents.send(
+            "updater:state",
+            updaterUiState
+        );
+    }
+}
+
+
+function patchUpdaterUiState(
+    patch
+) {
+
+    updaterUiState = {
+        ...updaterUiState,
+        ...patch,
+        currentVersion: app.getVersion(),
+        packaged: app.isPackaged
+    };
+
+
+    emitUpdaterUiState();
+
+
+    return updaterUiState;
+}
+
 
 ipcMain.handle(
     "updater:get-state",
-    async () => {
-
-        return getUpdaterState();
-    }
+    async () => ({
+        state: updaterUiState
+    })
 );
 
 
@@ -514,55 +330,41 @@ ipcMain.handle(
         ) {
 
             return {
-                success:
-                    false,
-
-                reason:
-                    "development",
-
                 state:
-                    getUpdaterState()
+                    patchUpdaterUiState({
+                        status: "development",
+                        error: null
+                    })
             };
         }
 
 
+        patchUpdaterUiState({
+            status: "checking",
+            progress: 0,
+            error: null
+        });
+
+
         try {
 
-            await autoUpdater
-                .checkForUpdates();
+            await autoUpdater.checkForUpdates();
 
 
             return {
-                success:
-                    true,
-
-                state:
-                    getUpdaterState()
+                state: updaterUiState
             };
 
         } catch (error) {
 
-            console.error(
-                "[Updater] erro na verificação manual:",
-                error
-            );
-
-
             return {
-                success:
-                    false,
-
-                reason:
-                    "error",
-
-                error:
-                    error?.message ||
-                    String(
-                        error
-                    ),
-
                 state:
-                    getUpdaterState()
+                    patchUpdaterUiState({
+                        status: "error",
+                        error:
+                            error?.message ||
+                            String(error)
+                    })
             };
         }
     }
@@ -578,97 +380,40 @@ ipcMain.handle(
         ) {
 
             return {
-                success:
-                    false,
-
-                reason:
-                    "development",
-
                 state:
-                    getUpdaterState()
-            };
-        }
-
-
-        if (
-            updaterState.status !==
-            "available"
-        ) {
-
-            return {
-                success:
-                    false,
-
-                reason:
-                    "not-available",
-
-                state:
-                    getUpdaterState()
+                    patchUpdaterUiState({
+                        status: "development"
+                    })
             };
         }
 
 
         try {
 
-            setUpdaterState({
-                status:
-                    "downloading",
-
-                percent:
-                    0,
-
-                error:
-                    null
+            patchUpdaterUiState({
+                status: "downloading",
+                progress: 0,
+                error: null
             });
 
 
-            await autoUpdater
-                .downloadUpdate();
+            await autoUpdater.downloadUpdate();
 
 
             return {
-                success:
-                    true,
-
-                state:
-                    getUpdaterState()
+                state: updaterUiState
             };
 
         } catch (error) {
 
-            console.error(
-                "[Updater] erro iniciando download:",
-                error
-            );
-
-
-            setUpdaterState({
-                status:
-                    "error",
-
-                error:
-                    error?.message ||
-                    String(
-                        error
-                    )
-            });
-
-
             return {
-                success:
-                    false,
-
-                reason:
-                    "error",
-
-                error:
-                    error?.message ||
-                    String(
-                        error
-                    ),
-
                 state:
-                    getUpdaterState()
+                    patchUpdaterUiState({
+                        status: "error",
+                        error:
+                            error?.message ||
+                            String(error)
+                    })
             };
         }
     }
@@ -684,52 +429,33 @@ ipcMain.handle(
         ) {
 
             return {
-                success:
-                    false,
-
-                reason:
-                    "development",
-
                 state:
-                    getUpdaterState()
+                    patchUpdaterUiState({
+                        status: "development"
+                    })
             };
         }
 
 
         if (
-            updaterState.status !==
+            updaterUiState.status !==
             "downloaded"
         ) {
 
             return {
-                success:
-                    false,
-
-                reason:
-                    "not-downloaded",
-
-                state:
-                    getUpdaterState()
+                state: updaterUiState
             };
         }
 
 
-        updaterInstalling =
-            true;
-
-
-        setUpdaterState({
-            status:
-                "installing",
-
-            error:
-                null
+        patchUpdaterUiState({
+            status: "installing",
+            error: null
         });
 
 
         setImmediate(
             () => {
-
                 autoUpdater.quitAndInstall(
                     false,
                     true
@@ -739,16 +465,105 @@ ipcMain.handle(
 
 
         return {
-            success:
-                true,
-
-            state:
-                getUpdaterState()
+            state: updaterUiState
         };
     }
 );
 
 
+autoUpdater.on(
+    "checking-for-update",
+    () => {
+
+        patchUpdaterUiState({
+            status: "checking",
+            progress: 0,
+            error: null
+        });
+    }
+);
+
+
+autoUpdater.on(
+    "update-available",
+    info => {
+
+        patchUpdaterUiState({
+            status: "available",
+            availableVersion:
+                info?.version ||
+                null,
+            progress: 0,
+            error: null
+        });
+    }
+);
+
+
+autoUpdater.on(
+    "update-not-available",
+    info => {
+
+        patchUpdaterUiState({
+            status: "not-available",
+            availableVersion:
+                info?.version ||
+                null,
+            progress: 0,
+            error: null
+        });
+    }
+);
+
+
+autoUpdater.on(
+    "download-progress",
+    progress => {
+
+        patchUpdaterUiState({
+            status: "downloading",
+            progress:
+                Number(
+                    progress?.percent ||
+                    0
+                ),
+            error: null
+        });
+    }
+);
+
+
+autoUpdater.on(
+    "update-downloaded",
+    info => {
+
+        patchUpdaterUiState({
+            status: "downloaded",
+            availableVersion:
+                info?.version ||
+                updaterUiState.availableVersion,
+            progress: 100,
+            error: null
+        });
+    }
+);
+
+
+autoUpdater.on(
+    "error",
+    error => {
+
+        patchUpdaterUiState({
+            status: "error",
+            error:
+                error?.message ||
+                String(error)
+        });
+    }
+);
+
+
+// ======================================================
 // ======================================================
 // HELPER DE ÁUDIO
 // ======================================================
@@ -954,144 +769,6 @@ function stopProcessAudio(
 
 
     return true;
-}
-
-
-// ======================================================
-// APP SHUTDOWN
-// ======================================================
-
-function cleanupBeforeExit(
-    reason =
-    "desconhecido"
-) {
-
-    if (
-        shutdownCleanupDone
-    ) {
-        return;
-    }
-
-
-    shutdownCleanupDone =
-        true;
-
-
-    console.log(
-        "[Shutdown] iniciando limpeza:",
-        reason
-    );
-
-
-    try {
-
-        screenShareManager
-            ?.cancelPicker?.();
-
-    } catch (error) {
-
-        console.error(
-            "[Shutdown] erro fechando picker:",
-            error
-        );
-    }
-
-
-    try {
-
-        stopProcessAudio();
-
-    } catch (error) {
-
-        console.error(
-            "[Shutdown] erro encerrando Process Audio:",
-            error
-        );
-    }
-
-
-    console.log(
-        "[Shutdown] limpeza concluída."
-    );
-}
-
-
-function requestAppShutdown(
-    reason =
-    "desconhecido"
-) {
-
-    if (
-        appIsQuitting
-    ) {
-
-        console.log(
-            "[Shutdown] encerramento já em andamento:",
-            reason
-        );
-
-
-        return;
-    }
-
-
-    appIsQuitting =
-        true;
-
-
-    console.log(
-        "[Shutdown] encerramento solicitado:",
-        reason
-    );
-
-
-    cleanupBeforeExit(
-        reason
-    );
-
-
-    /*
-     * Proteção contra alguma janela/handler externo impedir
-     * indefinidamente o encerramento do Electron.
-     */
-    forceExitTimer =
-        setTimeout(
-            () => {
-
-                console.warn(
-                    "[Shutdown] app.quit() não finalizou a tempo; usando app.exit(0)."
-                );
-
-
-                app.exit(
-                    0
-                );
-            },
-            2500
-        );
-
-
-    setImmediate(
-        () => {
-
-            try {
-
-                app.quit();
-
-            } catch (error) {
-
-                console.error(
-                    "[Shutdown] app.quit() falhou:",
-                    error
-                );
-
-
-                app.exit(
-                    0
-                );
-            }
-        }
-    );
 }
 
 
@@ -2143,103 +1820,109 @@ function guessServerNameFromUrl(
 }
 
 
-function buildPublicServerFileUrl(
-    serverUrl,
-    fileName
+function getServerAssetDirectory(
+    serverUrl
+) {
+
+    const hash =
+        crypto
+            .createHash(
+                "sha1"
+            )
+            .update(
+                String(
+                    serverUrl
+                )
+            )
+            .digest(
+                "hex"
+            )
+            .slice(
+                0,
+                16
+            );
+
+
+    return path.join(
+        app.getPath(
+            "userData"
+        ),
+        "server-assets",
+        hash
+    );
+}
+
+
+function fileToDataUrl(
+    filePath
 ) {
 
     if (
-        !serverUrl ||
-        !fileName
+        !filePath ||
+        !fs.existsSync(
+            filePath
+        )
     ) {
 
         return null;
     }
 
 
-    return (
-        normalizeServerUrl(
-            serverUrl
-        ) +
-        "/public/" +
-        encodeURIComponent(
-            String(
-                fileName
-            )
+    const extension =
+        path.extname(
+            filePath
         )
-    );
-}
+            .toLowerCase();
 
 
-function saveServerBrandingSnapshot(
-    input,
-    settings
-) {
+    const mimeTypes = {
 
-    if (
-        !input ||
-        !settings ||
-        typeof settings !==
-        "object"
-    ) {
+        ".png":
+            "image/png",
 
-        return false;
-    }
+        ".jpg":
+            "image/jpeg",
+
+        ".jpeg":
+            "image/jpeg",
+
+        ".webp":
+            "image/webp"
+    };
 
 
-    let serverUrl;
+    const mime =
+        mimeTypes[
+            extension
+            ] ||
+        "application/octet-stream";
 
 
     try {
 
-        serverUrl =
-            normalizeServerUrl(
-                input
+        const bytes =
+            fs.readFileSync(
+                filePath
             );
 
-    } catch {
 
-        return false;
+        return (
+            `data:${mime};base64,` +
+            bytes.toString(
+                "base64"
+            )
+        );
+
+    } catch (error) {
+
+        console.error(
+            "Erro lendo imagem:",
+            error
+        );
+
+
+        return null;
     }
-
-
-    const config =
-        readServerConfig();
-
-
-    const stored =
-        config.servers[
-            serverUrl
-            ] ||
-        {};
-
-
-    config.servers[
-        serverUrl
-        ] = {
-
-        ...stored,
-
-        name:
-            settings.name ||
-            stored.name ||
-            guessServerNameFromUrl(
-                serverUrl
-            ),
-
-        logoName:
-            settings.logo?.name ||
-            null,
-
-        bannerName:
-            settings.banner?.name ||
-            null
-    };
-
-
-    return writeServerConfig(
-        config
-    );
 }
 
 
@@ -2275,17 +1958,236 @@ function getServerProfile(
             ),
 
         avatarDataUrl:
-            buildPublicServerFileUrl(
-                serverUrl,
-                stored.logoName
+            fileToDataUrl(
+                stored.avatar
             ),
 
         bannerDataUrl:
-            buildPublicServerFileUrl(
-                serverUrl,
-                stored.bannerName
+            fileToDataUrl(
+                stored.banner
             )
     };
+}
+
+
+function saveServerImage(
+    input,
+    type,
+    sourcePath
+) {
+
+    const serverUrl =
+        normalizeServerUrl(
+            input
+        );
+
+
+    if (
+        type !==
+        "avatar" &&
+        type !==
+        "banner"
+    ) {
+
+        throw new Error(
+            "Tipo de imagem inválido."
+        );
+    }
+
+
+    const extension =
+        path.extname(
+            sourcePath
+        )
+            .toLowerCase();
+
+
+    if (
+        ![
+            ".png",
+            ".jpg",
+            ".jpeg",
+            ".webp"
+        ].includes(
+            extension
+        )
+    ) {
+
+        throw new Error(
+            "Formato não suportado."
+        );
+    }
+
+
+    const directory =
+        getServerAssetDirectory(
+            serverUrl
+        );
+
+
+    fs.mkdirSync(
+        directory,
+        {
+            recursive:
+                true
+        }
+    );
+
+
+    const config =
+        readServerConfig();
+
+
+    const existing =
+        config.servers[
+            serverUrl
+            ] ||
+        {};
+
+
+    const previousPath =
+        existing[
+            type
+            ];
+
+
+    const destination =
+        path.join(
+            directory,
+            `${type}${extension}`
+        );
+
+
+    fs.copyFileSync(
+        sourcePath,
+        destination
+    );
+
+
+    if (
+        previousPath &&
+        previousPath !==
+        destination &&
+        fs.existsSync(
+            previousPath
+        )
+    ) {
+
+        try {
+
+            fs.unlinkSync(
+                previousPath
+            );
+
+        } catch {}
+    }
+
+
+    config.servers[
+        serverUrl
+        ] = {
+
+        ...existing,
+
+        name:
+            existing.name ||
+            guessServerNameFromUrl(
+                serverUrl
+            ),
+
+        [type]:
+        destination
+    };
+
+
+    writeServerConfig(
+        config
+    );
+
+
+    return getServerProfile(
+        serverUrl
+    );
+}
+
+
+function removeServerImage(
+    input,
+    type
+) {
+
+    const serverUrl =
+        normalizeServerUrl(
+            input
+        );
+
+
+    if (
+        type !==
+        "avatar" &&
+        type !==
+        "banner"
+    ) {
+
+        throw new Error(
+            "Tipo de imagem inválido."
+        );
+    }
+
+
+    const config =
+        readServerConfig();
+
+
+    const existing =
+        config.servers[
+            serverUrl
+            ] ||
+        {};
+
+
+    const filePath =
+        existing[
+            type
+            ];
+
+
+    if (
+        filePath &&
+        fs.existsSync(
+            filePath
+        )
+    ) {
+
+        try {
+
+            fs.unlinkSync(
+                filePath
+            );
+
+        } catch {}
+    }
+
+
+    delete existing[
+        type
+        ];
+
+
+    config.servers[
+        serverUrl
+        ] =
+        existing;
+
+
+    writeServerConfig(
+        config
+    );
+
+
+    return getServerProfile(
+        serverUrl
+    );
 }
 
 
@@ -2615,6 +2517,334 @@ function saveServer(
 }
 
 
+function removeSavedServer(
+    input
+) {
+
+    const serverUrl =
+        normalizeServerUrl(
+            input
+        );
+
+
+    const config =
+        readServerConfig();
+
+
+    if (
+        !config.servers ||
+        !config.servers[
+            serverUrl
+            ]
+    ) {
+
+        return {
+            removed:
+                false,
+
+            currentServer:
+                config.server ||
+                null
+        };
+    }
+
+
+    delete config.servers[
+        serverUrl
+        ];
+
+
+    if (
+        config.server ===
+        serverUrl
+    ) {
+
+        config.server =
+            Object.keys(
+                config.servers
+            )[0] ||
+            null;
+    }
+
+
+    writeServerConfig(
+        config
+    );
+
+
+    return {
+        removed:
+            true,
+
+        currentServer:
+            config.server ||
+            null
+    };
+}
+
+
+
+// ======================================================
+// SERVER SIDEBAR
+// ======================================================
+
+function getServerSidebarState() {
+
+    const config =
+        readServerConfig();
+
+
+    const appIcon =
+        getAppIcon();
+
+
+    const servers =
+        Object.keys(
+            config.servers ||
+            {}
+        ).map(
+            serverUrl => {
+
+                const profile =
+                    getServerProfile(
+                        serverUrl
+                    );
+
+
+                return {
+                    url:
+                    profile.url,
+
+                    name:
+                    profile.name,
+
+                    avatarDataUrl:
+                        profile.avatarDataUrl ||
+                        null,
+
+                    bannerDataUrl:
+                        profile.bannerDataUrl ||
+                        null,
+
+                    active:
+                        profile.url ===
+                        config.server
+                };
+            }
+        );
+
+
+    return {
+        currentServer:
+            config.server ||
+            null,
+
+        appIconDataUrl:
+            appIcon &&
+            !appIcon.isEmpty()
+                ? appIcon.toDataURL()
+                : null,
+
+        servers
+    };
+}
+
+
+function getEmptyDesktopHtml() {
+
+    return `
+        <!doctype html>
+        <html>
+        <head>
+            <meta charset="utf-8">
+            <meta
+                name="viewport"
+                content="width=device-width,initial-scale=1"
+            >
+            <title>Sharkord Desktop</title>
+            <style>
+                html,
+                body {
+                    width:100%;
+                    height:100%;
+                    margin:0;
+                    background:#111214;
+                    color:#f2f3f5;
+                    font-family:
+                        system-ui,
+                        -apple-system,
+                        BlinkMacSystemFont,
+                        "Segoe UI",
+                        sans-serif;
+                }
+
+                body {
+                    display:flex;
+                    align-items:center;
+                    justify-content:center;
+                    box-sizing:border-box;
+                }
+
+                .empty {
+                    max-width:520px;
+                    padding:32px;
+                    text-align:center;
+                }
+
+                h1 {
+                    margin:0 0 10px;
+                    font-size:26px;
+                }
+
+                p {
+                    margin:0;
+                    color:#949ba4;
+                    font-size:14px;
+                    line-height:1.55;
+                }
+            </style>
+        </head>
+        <body>
+            <div class="empty">
+                <h1>Sharkord Desktop</h1>
+                <p>
+                    Clique no botão + da barra lateral para adicionar
+                    seu primeiro servidor.
+                </p>
+            </div>
+        </body>
+        </html>
+    `;
+}
+
+
+async function loadServerInMainWindow(
+    input
+) {
+
+    const serverUrl =
+        normalizeServerUrl(
+            input
+        );
+
+
+    console.log(
+        "Carregando servidor:",
+        serverUrl
+    );
+
+
+    createMainWindow();
+
+
+    try {
+
+        await mainWindow.loadURL(
+            serverUrl
+        );
+
+    } catch (error) {
+
+        console.error(
+            "Erro no loadURL:",
+            error
+        );
+
+
+        throw error;
+    }
+
+
+    saveServer(
+        serverUrl
+    );
+
+
+    try {
+
+        const profile =
+            getServerProfile(
+                serverUrl
+            );
+
+
+        mainWindow.setTitle(
+            profile?.name ||
+            guessServerNameFromUrl(
+                serverUrl
+            )
+        );
+
+    } catch {}
+
+
+    return {
+        success:
+            true,
+
+        serverUrl
+    };
+}
+
+
+async function openDesktopStartPage() {
+
+    createMainWindow();
+
+
+    const config =
+        readServerConfig();
+
+
+    const savedServers =
+        Object.keys(
+            config.servers ||
+            {}
+        );
+
+
+    const initialServer =
+        config.server ||
+        savedServers[0] ||
+        null;
+
+
+    if (
+        initialServer
+    ) {
+
+        try {
+
+            await loadServerInMainWindow(
+                initialServer
+            );
+
+
+            return;
+
+        } catch (error) {
+
+            console.error(
+                "[Server Sidebar] falha abrindo último servidor:",
+                error
+            );
+        }
+    }
+
+
+    const html =
+        getEmptyDesktopHtml();
+
+
+    await mainWindow.loadURL(
+        "data:text/html;charset=utf-8," +
+        encodeURIComponent(
+            html
+        )
+    );
+}
+
+
 // ======================================================
 // SERVER WINDOW
 // ======================================================
@@ -2707,9 +2937,7 @@ function createServerWindow() {
                 mainWindow.isDestroyed()
             ) {
 
-                requestAppShutdown(
-                    "janela de seleção de servidor fechada"
-                );
+                app.quit();
             }
         }
     );
@@ -2738,25 +2966,6 @@ function createMainWindow() {
         getAppIcon();
 
 
-    const mainPreloadPath =
-        path.join(
-            __dirname,
-            "main-preload.js"
-        );
-
-
-    if (
-        !fs.existsSync(
-            mainPreloadPath
-        )
-    ) {
-
-        throw new Error(
-            `main-preload.js não encontrado: ${mainPreloadPath}`
-        );
-    }
-
-
     mainWindow =
         new BrowserWindow({
             width:
@@ -2781,18 +2990,27 @@ function createMainWindow() {
             autoHideMenuBar:
                 true,
 
+            titleBarStyle:
+                "hidden",
+
+            titleBarOverlay: {
+                color:
+                    "#2b171c",
+
+                symbolColor:
+                    "#f2f3f5",
+
+                height:
+                    32
+            },
+
             webPreferences: {
 
                 preload:
-                    mainPreloadPath,
-
-                /*
-                 * Screen share usa video/canvas no renderer.
-                 * Impede o Chromium de reduzir timers/video quando
-                 * o Sharkord fica em segundo plano durante o jogo.
-                 */
-                backgroundThrottling:
-                    false,
+                    path.join(
+                        __dirname,
+                        "main-preload.js"
+                    ),
 
                 nodeIntegration:
                     false,
@@ -2800,14 +3018,6 @@ function createMainWindow() {
                 contextIsolation:
                     true,
 
-                /*
-                 * main-preload.js é um bootstrap modular e usa require()
-                 * para carregar ./preload/*.js. Preloads sandboxed não
-                 * podem resolver módulos locais do projeto.
-                 *
-                 * Segurança continua com nodeIntegration:false e
-                 * contextIsolation:true.
-                 */
                 sandbox:
                     false
             }
@@ -2821,6 +3031,48 @@ function createMainWindow() {
 
     attachSharkordWebSocketLogger(
         mainWindow
+    );
+
+
+    mainWindow.webContents.on(
+        "page-title-updated",
+        event => {
+
+            event.preventDefault();
+
+
+            try {
+
+                const currentUrl =
+                    mainWindow.webContents
+                        .getURL();
+
+
+                if (
+                    currentUrl.startsWith(
+                        "http://"
+                    ) ||
+                    currentUrl.startsWith(
+                        "https://"
+                    )
+                ) {
+
+                    const profile =
+                        getServerProfile(
+                            currentUrl
+                        );
+
+
+                    mainWindow.setTitle(
+                        profile?.name ||
+                        guessServerNameFromUrl(
+                            currentUrl
+                        )
+                    );
+                }
+
+            } catch {}
+        }
     );
 
 
@@ -2841,37 +3093,29 @@ function createMainWindow() {
         "close",
         event => {
 
-            /*
-             * Quando app.quit() já está em andamento, NÃO bloqueamos
-             * o close novamente. Isso evita o ciclo:
-             *
-             * close -> preventDefault -> app.quit -> close -> ...
-             */
-            if (
-                appIsQuitting ||
-                updaterInstalling
-            ) {
-
-                if (
-                    updaterInstalling
-                ) {
-
-                    console.log(
-                        "[Updater] fechamento autorizado para instalar atualização."
-                    );
-                }
-
-
-                return;
-            }
-
-
             event.preventDefault();
 
 
-            requestAppShutdown(
-                "janela principal fechada pelo usuário"
-            );
+            cancelPicker();
+
+
+            stopProcessAudio();
+
+
+            if (
+                mainWindow &&
+                !mainWindow.isDestroyed()
+            ) {
+
+                mainWindow.destroy();
+            }
+
+
+            mainWindow =
+                null;
+
+
+            app.quit();
         }
     );
 
@@ -2880,11 +3124,193 @@ function createMainWindow() {
         "closed",
         () => {
 
+            stopProcessAudio();
+
+
             mainWindow =
                 null;
         }
     );
 }
+
+
+// ======================================================
+// SERVER SIDEBAR IPC
+// ======================================================
+
+ipcMain.handle(
+    "server-sidebar:get-state",
+    async () => {
+
+        return getServerSidebarState();
+    }
+);
+
+
+ipcMain.handle(
+    "server-sidebar:connect",
+    async (
+        _event,
+        input
+    ) => {
+
+        return loadServerInMainWindow(
+            input
+        );
+    }
+);
+
+
+ipcMain.handle(
+    "server-sidebar:remove",
+    async (
+        _event,
+        input
+    ) => {
+
+        const result =
+            removeSavedServer(
+                input
+            );
+
+
+        if (
+            !result.removed
+        ) {
+
+            return {
+                ...result,
+                switched:
+                    false
+            };
+        }
+
+
+        let switched =
+            false;
+
+
+        if (
+            result.currentServer
+        ) {
+
+            const currentUrl =
+                mainWindow &&
+                !mainWindow.isDestroyed()
+                    ? mainWindow
+                        .webContents
+                        .getURL()
+                    : "";
+
+
+            let removedUrl =
+                null;
+
+
+            try {
+
+                removedUrl =
+                    normalizeServerUrl(
+                        input
+                    );
+
+            } catch {}
+
+
+            if (
+                removedUrl &&
+                currentUrl.startsWith(
+                    removedUrl
+                )
+            ) {
+
+                await loadServerInMainWindow(
+                    result.currentServer
+                );
+
+                switched =
+                    true;
+            }
+
+        } else {
+
+            const currentUrl =
+                mainWindow &&
+                !mainWindow.isDestroyed()
+                    ? mainWindow
+                        .webContents
+                        .getURL()
+                    : "";
+
+
+            let removedUrl =
+                null;
+
+
+            try {
+
+                removedUrl =
+                    normalizeServerUrl(
+                        input
+                    );
+
+            } catch {}
+
+
+            if (
+                removedUrl &&
+                currentUrl.startsWith(
+                    removedUrl
+                )
+            ) {
+
+                const html =
+                    getEmptyDesktopHtml();
+
+
+                await mainWindow.loadURL(
+                    "data:text/html;charset=utf-8," +
+                    encodeURIComponent(
+                        html
+                    )
+                );
+
+
+                mainWindow.setTitle(
+                    "Sharkord Desktop"
+                );
+
+                switched =
+                    true;
+            }
+        }
+
+
+        return {
+            ...result,
+            switched
+        };
+    }
+);
+
+
+ipcMain.handle(
+    "server-sidebar:add",
+    async (
+        _event,
+        input
+    ) => {
+
+        /*
+         * "Adicionar" também conecta.
+         * O saveServer() chamado após loadURL bem-sucedido
+         * grava o servidor na lista persistente.
+         */
+        return loadServerInMainWindow(
+            input
+        );
+    }
+);
 
 
 // ======================================================
@@ -3116,61 +3542,31 @@ ipcMain.handle(
 
 
 ipcMain.handle(
+    "server:branding:remove-image",
+    async (
+        _event,
+        options
+    ) => {
+
+        return removeServerImage(
+            options?.serverUrl,
+            options?.type
+        );
+    }
+);
+
+
+ipcMain.handle(
     "server:connect",
     async (
         _event,
         input
     ) => {
 
-        const serverUrl =
-            normalizeServerUrl(
+        const result =
+            await loadServerInMainWindow(
                 input
             );
-
-
-        console.log(
-            "Carregando servidor:",
-            serverUrl
-        );
-
-
-        createMainWindow();
-
-
-        try {
-
-            await mainWindow.loadURL(
-                serverUrl
-            );
-
-        } catch (error) {
-
-            console.error(
-                "Erro no loadURL:",
-                error
-            );
-
-
-            if (
-                mainWindow &&
-                !mainWindow.isDestroyed()
-            ) {
-
-                mainWindow.destroy();
-            }
-
-
-            mainWindow =
-                null;
-
-
-            throw error;
-        }
-
-
-        saveServer(
-            serverUrl
-        );
 
 
         if (
@@ -3186,12 +3582,690 @@ ipcMain.handle(
             null;
 
 
-        return {
-            success:
-                true
-        };
+        return result;
     }
 );
+
+// ======================================================
+// PICKER
+// ======================================================
+
+function createPickerWindow() {
+
+    if (
+        pickerWindow &&
+        !pickerWindow.isDestroyed()
+    ) {
+
+        pickerWindow.focus();
+
+
+        return;
+    }
+
+
+    const appIcon =
+        getAppIcon();
+
+
+    pickerWindow =
+        new BrowserWindow({
+            width:
+                1000,
+
+            height:
+                720,
+
+            minWidth:
+                700,
+
+            minHeight:
+                550,
+
+            title:
+                "Escolher o que compartilhar",
+
+            icon:
+                appIcon ||
+                undefined,
+
+            modal:
+                true,
+
+            parent:
+            mainWindow,
+
+            autoHideMenuBar:
+                true,
+
+            webPreferences: {
+
+                preload:
+                    path.join(
+                        __dirname,
+                        "preload.js"
+                    ),
+
+                nodeIntegration:
+                    false,
+
+                contextIsolation:
+                    true,
+
+                sandbox:
+                    true
+            }
+        });
+
+
+    applyWindowIcon(
+        pickerWindow
+    );
+
+
+    const pickerPath =
+        path.join(
+            __dirname,
+            "picker.html"
+        );
+
+
+    console.log(
+        "Picker carregado de:",
+        pickerPath
+    );
+
+
+    pickerWindow.loadFile(
+        pickerPath
+    );
+
+
+    pickerWindow.on(
+        "closed",
+        () => {
+
+            pickerWindow =
+                null;
+
+
+            if (
+                pickerReject
+            ) {
+
+                const reject =
+                    pickerReject;
+
+
+                pickerResolve =
+                    null;
+
+
+                pickerReject =
+                    null;
+
+
+                selectedShareOptions =
+                    null;
+
+
+                reject(
+                    new Error(
+                        "SCREEN_SHARE_CANCELLED"
+                    )
+                );
+            }
+        }
+    );
+}
+
+
+function cancelPicker() {
+
+    const reject =
+        pickerReject;
+
+
+    pickerResolve =
+        null;
+
+
+    pickerReject =
+        null;
+
+
+    selectedShareOptions =
+        null;
+
+
+    if (
+        reject
+    ) {
+
+        reject(
+            new Error(
+                "SCREEN_SHARE_CANCELLED"
+            )
+        );
+    }
+
+
+    if (
+        pickerWindow &&
+        !pickerWindow.isDestroyed()
+    ) {
+
+        pickerWindow.destroy();
+    }
+
+
+    pickerWindow =
+        null;
+}
+
+
+// ======================================================
+// ABRIR PICKER
+// ======================================================
+
+ipcMain.handle(
+    "screenshare:choose-source",
+    async () => {
+
+        if (
+            pickerResolve ||
+            pickerReject
+        ) {
+
+            cancelPicker();
+        }
+
+
+        return new Promise(
+            (
+                resolve,
+                reject
+            ) => {
+
+                pickerResolve =
+                    resolve;
+
+
+                pickerReject =
+                    reject;
+
+
+                createPickerWindow();
+            }
+        );
+    }
+);
+
+
+// ======================================================
+// FONTES
+// ======================================================
+
+ipcMain.handle(
+    "screen:get-sources",
+    async (
+        _event,
+        type =
+        "window"
+    ) => {
+
+        const start =
+            Date.now();
+
+
+        const sourceType =
+            type ===
+            "screen"
+                ? "screen"
+                : "window";
+
+
+        try {
+
+            const sources =
+                await desktopCapturer
+                    .getSources({
+                        types: [
+                            sourceType
+                        ],
+
+                        thumbnailSize: {
+                            width:
+                                0,
+
+                            height:
+                                0
+                        },
+
+                        fetchWindowIcons:
+                            sourceType ===
+                            "window"
+                    });
+
+
+            console.log(
+                `${sourceType}: ${sources.length} fontes em ${Date.now() - start}ms`
+            );
+
+
+            return sources.map(
+                source => ({
+
+                    id:
+                    source.id,
+
+                    name:
+                    source.name,
+
+                    displayId:
+                    source.display_id,
+
+                    appIcon:
+                        source.appIcon &&
+                        !source.appIcon.isEmpty()
+                            ? source.appIcon.toDataURL()
+                            : null
+                })
+            );
+
+        } catch (error) {
+
+            console.error(
+                "Erro listando fontes:",
+                error
+            );
+
+
+            return [];
+        }
+    }
+);
+
+
+// ======================================================
+// THUMBNAILS
+// ======================================================
+
+ipcMain.handle(
+    "screen:get-thumbnails",
+    async (
+        _event,
+        type
+    ) => {
+
+        if (
+            type !==
+            "screen"
+        ) {
+
+            return [];
+        }
+
+
+        try {
+
+            const sources =
+                await desktopCapturer
+                    .getSources({
+                        types: [
+                            "screen"
+                        ],
+
+                        thumbnailSize: {
+                            width:
+                                320,
+
+                            height:
+                                180
+                        },
+
+                        fetchWindowIcons:
+                            false
+                    });
+
+
+            return sources.map(
+                source => ({
+
+                    id:
+                    source.id,
+
+                    thumbnail:
+                        source.thumbnail &&
+                        !source.thumbnail.isEmpty()
+                            ? source.thumbnail.toDataURL()
+                            : null
+                })
+            );
+
+        } catch (error) {
+
+            console.error(
+                "Erro carregando thumbnails:",
+                error
+            );
+
+
+            return [];
+        }
+    }
+);
+
+
+// ======================================================
+// SELECT SOURCE
+// ======================================================
+
+ipcMain.on(
+    "screen:select-source",
+    (
+        _event,
+        options
+    ) => {
+
+        if (
+            !options ||
+            !options.sourceId
+        ) {
+
+            return;
+        }
+
+
+        const sourceId =
+            String(
+                options.sourceId
+            );
+
+
+        const isWindow =
+            sourceId.startsWith(
+                "window:"
+            );
+
+
+        let audioMode =
+            String(
+                options.audioMode ||
+                "none"
+            );
+
+
+        if (
+            audioMode !==
+            "process" &&
+            audioMode !==
+            "loopback" &&
+            audioMode !==
+            "none"
+        ) {
+
+            audioMode =
+                "none";
+        }
+
+
+        if (
+            audioMode ===
+            "process" &&
+            !isWindow
+        ) {
+
+            audioMode =
+                "loopback";
+        }
+
+
+        console.log(
+            "Seleção do picker:",
+            {
+                sourceId,
+                isWindow,
+                audioMode
+            }
+        );
+
+
+        selectedShareOptions = {
+            sourceId,
+            audioMode
+        };
+
+
+        const result = {
+            sourceId,
+            audioMode
+        };
+
+
+        const resolve =
+            pickerResolve;
+
+
+        pickerResolve =
+            null;
+
+
+        pickerReject =
+            null;
+
+
+        if (
+            pickerWindow &&
+            !pickerWindow.isDestroyed()
+        ) {
+
+            pickerWindow.destroy();
+        }
+
+
+        pickerWindow =
+            null;
+
+
+        if (
+            resolve
+        ) {
+
+            resolve(
+                result
+            );
+        }
+    }
+);
+
+
+ipcMain.on(
+    "screen:cancel",
+    () => {
+
+        console.log(
+            "Compartilhamento cancelado."
+        );
+
+
+        cancelPicker();
+    }
+);
+
+
+// ======================================================
+// DISPLAY MEDIA
+// ======================================================
+
+function configureDisplayMediaHandler() {
+
+    session.defaultSession
+        .setDisplayMediaRequestHandler(
+            async (
+                request,
+                callback
+            ) => {
+
+                console.log(
+                    "getDisplayMedia real:",
+                    request.securityOrigin
+                );
+
+
+                if (
+                    !selectedShareOptions
+                ) {
+
+                    console.error(
+                        "getDisplayMedia sem fonte pré-selecionada."
+                    );
+
+
+                    return;
+                }
+
+
+                const selection =
+                    selectedShareOptions;
+
+
+                selectedShareOptions =
+                    null;
+
+
+                console.log(
+                    "Iniciando captura:",
+                    selection
+                );
+
+
+                try {
+
+                    const sources =
+                        await desktopCapturer
+                            .getSources({
+                                types: [
+                                    "screen",
+                                    "window"
+                                ],
+
+                                thumbnailSize: {
+                                    width:
+                                        0,
+
+                                    height:
+                                        0
+                                },
+
+                                fetchWindowIcons:
+                                    false
+                            });
+
+
+                    const source =
+                        sources.find(
+                            item =>
+                                item.id ===
+                                selection.sourceId
+                        );
+
+
+                    if (
+                        !source
+                    ) {
+
+                        console.error(
+                            "Fonte desapareceu:",
+                            selection.sourceId
+                        );
+
+
+                        return;
+                    }
+
+
+                    if (
+                        selection.audioMode ===
+                        "loopback"
+                    ) {
+
+                        console.log(
+                            "Captura:",
+                            source.name
+                        );
+
+
+                        console.log(
+                            "Áudio: LOOPBACK GLOBAL"
+                        );
+
+
+                        callback({
+                            video:
+                            source,
+
+                            audio:
+                                "loopback"
+                        });
+
+
+                        return;
+                    }
+
+
+                    if (
+                        selection.audioMode ===
+                        "process"
+                    ) {
+
+                        console.log(
+                            "Captura:",
+                            source.name
+                        );
+
+
+                        console.log(
+                            "Áudio: PROCESS LOOPBACK"
+                        );
+
+
+                        callback({
+                            video:
+                            source
+                        });
+
+
+                        return;
+                    }
+
+
+                    console.log(
+                        "Captura:",
+                        source.name
+                    );
+
+
+                    console.log(
+                        "Áudio: DESATIVADO"
+                    );
+
+
+                    callback({
+                        video:
+                        source
+                    });
+
+                } catch (error) {
+
+                    console.error(
+                        "Erro iniciando captura:",
+                        error
+                    );
+                }
+            }
+        );
+}
 
 
 // ======================================================
@@ -3239,6 +4313,7 @@ function configureSharkordApiLogger() {
             const isNetworkDataRequest =
                 resourceType === "xhr" ||
                 resourceType === "fetch" ||
+                resourceType === "websocket" ||
                 resourceType === "websocket";
 
 
@@ -3383,10 +4458,8 @@ function configureSharkordApiLogger() {
 
                                 console.log(
                                     "[Sharkord API BODY]",
-                                    redactSensitiveWebSocketData(
-                                        bodies.join(
-                                            "\n"
-                                        )
+                                    bodies.join(
+                                        "\n"
                                     )
                                 );
                             }
@@ -3486,379 +4559,136 @@ function isInterestingWebSocketPayload(
 
 
 function attachSharkordWebSocketLogger(win) {
+    if (!win || win.isDestroyed()) return;
 
-    if (
-        !win ||
-        win.isDestroyed()
-    ) {
+    const debuggerClient = win.webContents.debugger;
+    const subscriptionPathsById = new Map();
+    const liveUsers = new Map();
+    const liveRoles = new Map();
+    let livePublicSettings = null;
 
-        return;
-    }
-
-
-    const debuggerClient =
-        win.webContents.debugger;
-
-
-    const subscriptionPathsById =
-        new Map();
-
-
-    const liveUsers =
-        new Map();
-
-
-    const liveRoles =
-        new Map();
-
-
-    let livePublicSettings =
-        null;
-
-
-    // ==================================================
-    // SERVER BRANDING
-    // ==================================================
-
-    function compactBrandFile(
-        file
-    ) {
-
-        if (
-            !file ||
-            typeof file !==
-            "object"
-        ) {
-
-            return null;
-        }
-
-
+    function compactBrandFile(file) {
+        if (!file || typeof file !== "object") return null;
         return {
-
-            id:
-                file.id ??
-                null,
-
-            name:
-                file.name ??
-                null,
-
-            originalName:
-                file.originalName ??
-                null,
-
-            mimeType:
-                file.mimeType ??
-                null,
-
-            extension:
-                file.extension ??
-                null,
-
-            size:
-                file.size ??
-                null
+            id: file.id ?? null,
+            name: file.name ?? null,
+            originalName: file.originalName ?? null,
+            mimeType: file.mimeType ?? null,
+            extension: file.extension ?? null,
+            size: file.size ?? null
         };
     }
 
-
-    function compactPublicSettings(
-        settings
-    ) {
-
-        if (
-            !settings ||
-            typeof settings !==
-            "object"
-        ) {
-
-            return null;
-        }
-
+    function compactPublicSettings(settings) {
+        if (!settings || typeof settings !== "object") return null;
 
         return {
-
-            name:
-                settings.name ||
-                null,
-
-            serverId:
-                settings.serverId ||
-                null,
-
-            logo:
-                compactBrandFile(
-                    settings.logo
-                ),
-
-            banner:
-                compactBrandFile(
-                    settings.banner
-                )
+            name: settings.name || null,
+            serverId: settings.serverId || null,
+            logo: compactBrandFile(settings.logo),
+            banner: compactBrandFile(settings.banner)
         };
     }
 
-
-    function sendBrandingSnapshot(
-        reason
-    ) {
-
-        if (
-            !win ||
-            win.isDestroyed() ||
-            !livePublicSettings
-        ) {
-
-            return;
-        }
-
+    function sendBrandingSnapshot(reason) {
+        if (!win || win.isDestroyed() || !livePublicSettings) return;
 
         win.webContents.send(
             "server-branding:server-data",
             livePublicSettings
         );
 
-
-        console.log(
-            "[Server Branding] dados server-side enviados:",
-            {
-                reason,
-
-                name:
-                livePublicSettings.name,
-
-                logo:
-                    livePublicSettings.logo
-                        ?.name ||
-                    null,
-
-                banner:
-                    livePublicSettings.banner
-                        ?.name ||
-                    null
-            }
-        );
+        console.log("[Server Branding] dados server-side enviados:", {
+            reason,
+            name: livePublicSettings.name,
+            logo: livePublicSettings.logo?.name || null,
+            banner: livePublicSettings.banner?.name || null
+        });
     }
 
-
-    function findPublicSettings(
-        value,
-        depth = 0
-    ) {
-
-        if (
-            depth >
-            12 ||
-            !value ||
-            typeof value !==
-            "object"
-        ) {
-
-            return null;
-        }
-
+    function findPublicSettings(value, depth = 0) {
+        if (depth > 12 || !value || typeof value !== "object") return null;
 
         if (
             value.publicSettings &&
-            typeof value.publicSettings ===
-            "object"
+            typeof value.publicSettings === "object"
         ) {
-
             return value.publicSettings;
         }
 
-
-        /*
-         * Também aceita publicSettings quando
-         * ele aparece diretamente como objeto,
-         * sem a chave "publicSettings".
-         */
         if (
-            typeof value.name ===
-            "string" &&
-
-            value.serverId !=
-            null &&
-
+            typeof value.name === "string" &&
+            value.serverId != null &&
             (
-                Object.prototype
-                    .hasOwnProperty.call(
-                    value,
-                    "logo"
-                ) ||
-
-                Object.prototype
-                    .hasOwnProperty.call(
-                    value,
-                    "banner"
-                )
+                Object.prototype.hasOwnProperty.call(value, "logo") ||
+                Object.prototype.hasOwnProperty.call(value, "banner")
             )
         ) {
-
             return value;
         }
 
+        const children = Array.isArray(value)
+            ? value
+            : Object.values(value);
 
-        const children =
-            Array.isArray(
-                value
-            )
-                ? value
-                : Object.values(
-                    value
-                );
-
-
-        for (
-            const child
-            of children
-            ) {
-
-            const found =
-                findPublicSettings(
-                    child,
-                    depth +
-                    1
-                );
-
-
-            if (
-                found
-            ) {
-
-                return found;
-            }
+        for (const child of children) {
+            const found = findPublicSettings(child, depth + 1);
+            if (found) return found;
         }
-
 
         return null;
     }
 
+    function updatePublicSettings(value, reason) {
+        const found = findPublicSettings(value);
+        if (!found) return false;
 
-    function updatePublicSettings(
-        value,
-        reason
-    ) {
+        const compact = compactPublicSettings(found);
+        if (!compact) return false;
 
-        const found =
-            findPublicSettings(
-                value
-            );
+        const nextSignature = JSON.stringify(compact);
+        const previousSignature = JSON.stringify(livePublicSettings);
 
+        if (nextSignature === previousSignature) return true;
 
-        if (
-            !found
-        ) {
-
-            return false;
-        }
-
-
-        const compact =
-            compactPublicSettings(
-                found
-            );
-
-
-        if (
-            !compact
-        ) {
-
-            return false;
-        }
-
-
-        const nextSignature =
-            JSON.stringify(
-                compact
-            );
-
-
-        const previousSignature =
-            JSON.stringify(
-                livePublicSettings
-            );
-
-
-        /*
-         * Evita mandar a mesma informação
-         * repetidamente para o preload.
-         */
-        if (
-            nextSignature ===
-            previousSignature
-        ) {
-
-            return true;
-        }
-
-
-        livePublicSettings =
-            compact;
-
-
-        /*
-         * Mantém apenas os metadados do branding no server.json.
-         * A imagem continua server-side; salvamos somente nome/filename
-         * para que a tela "Último servidor" consiga montar /public/<arquivo>.
-         */
-        try {
-
-            const currentUrl =
-                win.webContents
-                    .getURL();
-
-
-            if (
-                currentUrl
-            ) {
-
-                saveServerBrandingSnapshot(
-                    currentUrl,
-                    compact
-                );
-            }
-
-        } catch (error) {
-
-            console.warn(
-                "[Server Branding] não foi possível salvar snapshot para o launcher:",
-                error?.message ||
-                error
-            );
-        }
-
-
-        sendBrandingSnapshot(
-            reason
-        );
-
-
+        livePublicSettings = compact;
+        sendBrandingSnapshot(reason);
         return true;
     }
 
+    function compactUser(user) {
+        if (!user || user.id == null) return null;
 
-    // ==================================================
-    // MEMBER ROLES
-    // ==================================================
+        const compactFile =
+            file => {
 
-    function compactUser(
-        user
-    ) {
+                if (
+                    !file ||
+                    typeof file !==
+                    "object"
+                ) {
 
-        if (
-            !user ||
-            user.id ==
-            null
-        ) {
+                    return null;
+                }
 
-            return null;
-        }
+
+                return {
+                    id:
+                        file.id ??
+                        null,
+
+                    name:
+                        file.name ||
+                        null,
+
+                    originalName:
+                        file.originalName ||
+                        null
+                };
+            };
 
 
         return {
-
             id:
             user.id,
 
@@ -3870,889 +4700,222 @@ function attachSharkordWebSocketLogger(win) {
                     user.roleIds
                 )
                     ? user.roleIds
-                    : []
+                    : [],
+
+            avatar:
+                compactFile(
+                    user.avatar
+                ),
+
+            banner:
+                compactFile(
+                    user.banner
+                ),
+
+            bannerColor:
+                user.bannerColor ||
+                null
         };
     }
 
-
-    function compactRole(
-        role
-    ) {
-
-        if (
-            !role ||
-            role.id ==
-            null
-        ) {
-
-            return null;
-        }
-
-
+    function compactRole(role) {
+        if (!role || role.id == null) return null;
         return {
-
-            id:
-            role.id,
-
-            name:
-            role.name,
-
-            color:
-                role.color ||
-                null,
-
-            isDefault:
-                Boolean(
-                    role.isDefault
-                )
+            id: role.id,
+            name: role.name,
+            color: role.color || null,
+            isDefault: Boolean(role.isDefault)
         };
     }
 
-
-    function sendSnapshot(
-        reason
-    ) {
-
-        if (
-            !win ||
-            win.isDestroyed()
-        ) {
-
-            return;
-        }
-
+    function sendSnapshot(reason) {
+        if (!win || win.isDestroyed()) return;
 
         const compactData = {
-
-            users:
-                Array
-                    .from(
-                        liveUsers.values()
-                    )
-                    .filter(
-                        user =>
-                            user &&
-                            user.name !==
-                            "__deleted_user__"
-                    ),
-
-            roles:
-                Array.from(
-                    liveRoles.values()
-                )
+            users: Array.from(liveUsers.values())
+                .filter(user => user && user.name !== "__deleted_user__"),
+            roles: Array.from(liveRoles.values())
         };
 
-
-        win.webContents.send(
-            "member-roles:server-data",
-            compactData
-        );
-
-
-        console.log(
-            "[Member Roles] dados enviados ao preload:",
-            {
-                reason,
-
-                users:
-                compactData.users.length,
-
-                roles:
-                compactData.roles.length
-            }
-        );
+        win.webContents.send("member-roles:server-data", compactData);
+        console.log("[Member Roles] dados enviados ao preload:", {
+            reason,
+            users: compactData.users.length,
+            roles: compactData.roles.length
+        });
     }
 
-
-    function findServerData(
-        value,
-        depth = 0
-    ) {
-
-        if (
-            depth >
-            10 ||
-            !value ||
-            typeof value !==
-            "object"
-        ) {
-
-            return null;
+    function findServerData(value, depth = 0) {
+        if (depth > 10 || !value || typeof value !== "object") return null;
+        if (Array.isArray(value.users) && Array.isArray(value.roles)) return value;
+        const children = Array.isArray(value) ? value : Object.values(value);
+        for (const child of children) {
+            const found = findServerData(child, depth + 1);
+            if (found) return found;
         }
-
-
-        if (
-            Array.isArray(
-                value.users
-            ) &&
-            Array.isArray(
-                value.roles
-            )
-        ) {
-
-            return value;
-        }
-
-
-        const children =
-            Array.isArray(
-                value
-            )
-                ? value
-                : Object.values(
-                    value
-                );
-
-
-        for (
-            const child
-            of children
-            ) {
-
-            const found =
-                findServerData(
-                    child,
-                    depth +
-                    1
-                );
-
-
-            if (
-                found
-            ) {
-
-                return found;
-            }
-        }
-
-
         return null;
     }
 
-
-    function replaceInitialState(
-        serverData
-    ) {
-
+    function replaceInitialState(serverData) {
         liveUsers.clear();
-
-
         liveRoles.clear();
 
-
-        for (
-            const rawUser
-            of serverData.users ||
-        []
-            ) {
-
-            const user =
-                compactUser(
-                    rawUser
-                );
-
-
-            if (
-                user &&
-                user.name !==
-                "__deleted_user__"
-            ) {
-
-                liveUsers.set(
-                    Number(
-                        user.id
-                    ),
-                    user
-                );
+        for (const rawUser of serverData.users || []) {
+            const user = compactUser(rawUser);
+            if (user && user.name !== "__deleted_user__") {
+                liveUsers.set(Number(user.id), user);
             }
         }
 
-
-        for (
-            const rawRole
-            of serverData.roles ||
-        []
-            ) {
-
-            const role =
-                compactRole(
-                    rawRole
-                );
-
-
-            if (
-                role
-            ) {
-
-                liveRoles.set(
-                    Number(
-                        role.id
-                    ),
-                    role
-                );
-            }
+        for (const rawRole of serverData.roles || []) {
+            const role = compactRole(rawRole);
+            if (role) liveRoles.set(Number(role.id), role);
         }
 
-
-        sendSnapshot(
-            "initial-state"
-        );
+        sendSnapshot("initial-state");
     }
 
-
-    // ==================================================
-    // SUBSCRIPTIONS
-    // ==================================================
-
-    function learnSubscriptions(
-        parsed
-    ) {
-
-        const list =
-            Array.isArray(
-                parsed
-            )
-                ? parsed
-                : [
-                    parsed
-                ];
-
-
-        for (
-            const item
-            of list
-            ) {
-
+    function learnSubscriptions(parsed) {
+        const list = Array.isArray(parsed) ? parsed : [parsed];
+        for (const item of list) {
             if (
-                item?.method ===
-                "subscription" &&
-
-                item?.id !=
-                null &&
-
+                item?.method === "subscription" &&
+                item?.id != null &&
                 item?.params?.path
             ) {
-
-                subscriptionPathsById.set(
-                    Number(
-                        item.id
-                    ),
-
-                    String(
-                        item.params.path
-                    )
-                );
+                subscriptionPathsById.set(Number(item.id), String(item.params.path));
             }
         }
     }
 
-
-    function unwrapData(
-        message
-    ) {
-
-        return (
-            message?.result?.data ??
-            message?.result ??
-            message?.data ??
-            null
-        );
+    function unwrapData(message) {
+        return message?.result?.data ?? message?.result ?? message?.data ?? null;
     }
 
+    function findEntity(value, depth = 0) {
+        if (depth > 8 || value == null) return null;
+        if (typeof value === "number" || typeof value === "string") return { id: value };
+        if (typeof value !== "object") return null;
+        if (value.id != null) return value;
 
-    function findEntity(
-        value,
-        depth = 0
-    ) {
-
-        if (
-            depth >
-            8 ||
-            value ==
-            null
-        ) {
-
-            return null;
-        }
-
-
-        if (
-            typeof value ===
-            "number" ||
-            typeof value ===
-            "string"
-        ) {
-
-            return {
-                id:
-                value
-            };
-        }
-
-
-        if (
-            typeof value !==
-            "object"
-        ) {
-
-            return null;
-        }
-
-
-        if (
-            value.id !=
-            null
-        ) {
-
-            return value;
-        }
-
-
-        for (
-            const key
-            of [
-            "user",
-            "member",
-            "role",
-            "data"
-        ]
-            ) {
-
-            if (
-                value[
-                    key
-                    ] !==
-                undefined
-            ) {
-
-                const found =
-                    findEntity(
-                        value[
-                            key
-                            ],
-                        depth +
-                        1
-                    );
-
-
-                if (
-                    found
-                ) {
-
-                    return found;
-                }
+        for (const key of ["user", "member", "role", "data"]) {
+            if (value[key] !== undefined) {
+                const found = findEntity(value[key], depth + 1);
+                if (found) return found;
             }
         }
 
-
-        const children =
-            Array.isArray(
-                value
-            )
-                ? value
-                : Object.values(
-                    value
-                );
-
-
-        for (
-            const child
-            of children
-            ) {
-
-            const found =
-                findEntity(
-                    child,
-                    depth +
-                    1
-                );
-
-
-            if (
-                found
-            ) {
-
-                return found;
-            }
+        const children = Array.isArray(value) ? value : Object.values(value);
+        for (const child of children) {
+            const found = findEntity(child, depth + 1);
+            if (found) return found;
         }
-
-
         return null;
     }
 
+    function applyLiveMessage(message) {
+        if (!message || message.id == null) return false;
+        const path = subscriptionPathsById.get(Number(message.id));
+        if (!path) return false;
 
-    function applyLiveMessage(
-        message
-    ) {
+        const raw = findEntity(unwrapData(message));
+        if (!raw || raw.id == null) return false;
 
-        if (
-            !message ||
-            message.id ==
-            null
-        ) {
-
-            return false;
+        if (["users.onUpdate", "users.onCreate", "users.onJoin"].includes(path)) {
+            const previous = liveUsers.get(Number(raw.id)) || {};
+            const user = compactUser({ ...previous, ...raw });
+            if (!user) return false;
+            liveUsers.set(Number(user.id), user);
+            sendSnapshot(path);
+            return true;
         }
 
-
-        const path =
-            subscriptionPathsById.get(
-                Number(
-                    message.id
-                )
-            );
-
-
-        if (
-            !path
-        ) {
-
-            return false;
+        if (["users.onDelete", "users.onLeave"].includes(path)) {
+            liveUsers.delete(Number(raw.id));
+            sendSnapshot(path);
+            return true;
         }
 
-
-        const raw =
-            findEntity(
-                unwrapData(
-                    message
-                )
-            );
-
-
-        if (
-            !raw ||
-            raw.id ==
-            null
-        ) {
-
-            return false;
+        if (["roles.onUpdate", "roles.onCreate"].includes(path)) {
+            const previous = liveRoles.get(Number(raw.id)) || {};
+            const role = compactRole({ ...previous, ...raw });
+            if (!role) return false;
+            liveRoles.set(Number(role.id), role);
+            sendSnapshot(path);
+            return true;
         }
 
-
-        // ==============================================
-        // USERS
-        // ==============================================
-
-        if (
-            [
-                "users.onUpdate",
-                "users.onCreate",
-                "users.onJoin"
-            ].includes(
-                path
-            )
-        ) {
-
-            const previous =
-                liveUsers.get(
-                    Number(
-                        raw.id
-                    )
-                ) ||
-                {};
-
-
-            const user =
-                compactUser({
-                    ...previous,
-                    ...raw
+        if (path === "roles.onDelete") {
+            const deletedId = Number(raw.id);
+            liveRoles.delete(deletedId);
+            for (const [id, user] of liveUsers) {
+                liveUsers.set(id, {
+                    ...user,
+                    roleIds: (user.roleIds || []).filter(roleId => Number(roleId) !== deletedId)
                 });
-
-
-            if (
-                !user
-            ) {
-
-                return false;
             }
-
-
-            liveUsers.set(
-                Number(
-                    user.id
-                ),
-                user
-            );
-
-
-            sendSnapshot(
-                path
-            );
-
-
+            sendSnapshot(path);
             return true;
         }
-
-
-        if (
-            [
-                "users.onDelete",
-                "users.onLeave"
-            ].includes(
-                path
-            )
-        ) {
-
-            liveUsers.delete(
-                Number(
-                    raw.id
-                )
-            );
-
-
-            sendSnapshot(
-                path
-            );
-
-
-            return true;
-        }
-
-
-        // ==============================================
-        // ROLES
-        // ==============================================
-
-        if (
-            [
-                "roles.onUpdate",
-                "roles.onCreate"
-            ].includes(
-                path
-            )
-        ) {
-
-            const previous =
-                liveRoles.get(
-                    Number(
-                        raw.id
-                    )
-                ) ||
-                {};
-
-
-            const role =
-                compactRole({
-                    ...previous,
-                    ...raw
-                });
-
-
-            if (
-                !role
-            ) {
-
-                return false;
-            }
-
-
-            liveRoles.set(
-                Number(
-                    role.id
-                ),
-                role
-            );
-
-
-            sendSnapshot(
-                path
-            );
-
-
-            return true;
-        }
-
-
-        if (
-            path ===
-            "roles.onDelete"
-        ) {
-
-            const deletedId =
-                Number(
-                    raw.id
-                );
-
-
-            liveRoles.delete(
-                deletedId
-            );
-
-
-            for (
-                const [
-                    id,
-                    user
-                ]
-                of liveUsers
-                ) {
-
-                liveUsers.set(
-                    id,
-                    {
-                        ...user,
-
-                        roleIds:
-                            (
-                                user.roleIds ||
-                                []
-                            ).filter(
-                                roleId =>
-                                    Number(
-                                        roleId
-                                    ) !==
-                                    deletedId
-                            )
-                    }
-                );
-            }
-
-
-            sendSnapshot(
-                path
-            );
-
-
-            return true;
-        }
-
 
         return false;
     }
 
-
-    // ==================================================
-    // DEBUGGER / WEBSOCKET
-    // ==================================================
-
     try {
+        if (!debuggerClient.isAttached()) debuggerClient.attach("1.3");
 
-        if (
-            !debuggerClient
-                .isAttached()
-        ) {
+        debuggerClient.sendCommand("Network.enable").catch(error => {
+            console.error("[Sharkord WS] erro habilitando Network:", error);
+        });
 
-            debuggerClient.attach(
-                "1.3"
-            );
-        }
+        debuggerClient.on("message", (_event, method, params) => {
+            const received = method === "Network.webSocketFrameReceived";
+            const sent = method === "Network.webSocketFrameSent";
+            if (!received && !sent) return;
 
+            const frame = params?.response;
+            if (!frame || Number(frame.opcode) !== 1) return;
 
-        debuggerClient
-            .sendCommand(
-                "Network.enable"
-            )
-            .catch(
-                error => {
+            const payload = String(frame.payloadData || "");
 
-                    console.error(
-                        "[Sharkord WS] erro habilitando Network:",
-                        error
-                    );
-                }
-            );
+            try {
+                const parsed = JSON.parse(payload);
 
+                if (sent) learnSubscriptions(parsed);
 
-        debuggerClient.on(
-            "message",
-            (
-                _event,
-                method,
-                params
-            ) => {
+                if (received) {
+                    const list = Array.isArray(parsed) ? parsed : [parsed];
+                    for (const message of list) {
+                        updatePublicSettings(message, "websocket");
 
-                const received =
-                    method ===
-                    "Network.webSocketFrameReceived";
-
-
-                const sent =
-                    method ===
-                    "Network.webSocketFrameSent";
-
-
-                if (
-                    !received &&
-                    !sent
-                ) {
-
-                    return;
-                }
-
-
-                const frame =
-                    params
-                        ?.response;
-
-
-                if (
-                    !frame ||
-                    Number(
-                        frame.opcode
-                    ) !==
-                    1
-                ) {
-
-                    return;
-                }
-
-
-                const payload =
-                    String(
-                        frame.payloadData ||
-                        ""
-                    );
-
-
-                try {
-
-                    const parsed =
-                        JSON.parse(
-                            payload
-                        );
-
-
-                    if (
-                        sent
-                    ) {
-
-                        learnSubscriptions(
-                            parsed
-                        );
+                        const serverData = findServerData(message);
+                        if (serverData) replaceInitialState(serverData);
+                        else applyLiveMessage(message);
                     }
-
-
-                    if (
-                        received
-                    ) {
-
-                        const list =
-                            Array.isArray(
-                                parsed
-                            )
-                                ? parsed
-                                : [
-                                    parsed
-                                ];
-
-
-                        for (
-                            const message
-                            of list
-                            ) {
-
-                            /*
-                             * Primeiro tenta encontrar
-                             * publicSettings.
-                             *
-                             * Isso alimenta:
-                             *
-                             * branding-preload.js
-                             */
-                            updatePublicSettings(
-                                message,
-                                "websocket"
-                            );
-
-
-                            /*
-                             * Depois mantém a lógica
-                             * existente de usuários/roles.
-                             */
-                            const serverData =
-                                findServerData(
-                                    message
-                                );
-
-
-                            if (
-                                serverData
-                            ) {
-
-                                replaceInitialState(
-                                    serverData
-                                );
-
-                            } else {
-
-                                applyLiveMessage(
-                                    message
-                                );
-                            }
-                        }
-                    }
-
-                } catch {}
-
-
-                if (
-                    !isInterestingWebSocketPayload(
-                        payload
-                    )
-                ) {
-
-                    return;
                 }
+            } catch {}
 
+            if (!isInterestingWebSocketPayload(payload)) return;
 
-                const safePayload =
-                    redactSensitiveWebSocketData(
-                        payload
-                    );
+            const safePayload = redactSensitiveWebSocketData(payload);
+            const MAX_LOG_LENGTH = 20000;
+            const output = safePayload.length > MAX_LOG_LENGTH
+                ? safePayload.slice(0, MAX_LOG_LENGTH) + " ... <TRUNCATED>"
+                : safePayload;
 
+            console.log(
+                received ? "[Sharkord WS RECEIVED]" : "[Sharkord WS SENT]",
+                output
+            );
+        });
 
-                const MAX_LOG_LENGTH =
-                    20000;
+        debuggerClient.on("detach", (_event, reason) => {
+            console.log("[Sharkord WS] debugger desconectado:", reason);
+        });
 
-
-                const output =
-                    safePayload.length >
-                    MAX_LOG_LENGTH
-                        ? (
-                            safePayload.slice(
-                                0,
-                                MAX_LOG_LENGTH
-                            ) +
-                            " ... <TRUNCATED>"
-                        )
-                        : safePayload;
-
-
-                console.log(
-                    received
-                        ? "[Sharkord WS RECEIVED]"
-                        : "[Sharkord WS SENT]",
-                    output
-                );
-            }
-        );
-
-
-        debuggerClient.on(
-            "detach",
-            (
-                _event,
-                reason
-            ) => {
-
-                console.log(
-                    "[Sharkord WS] debugger desconectado:",
-                    reason
-                );
-            }
-        );
-
-
-        console.log(
-            "[Sharkord WS] logger de frames ativado."
-        );
-
+        console.log("[Sharkord WS] logger de frames ativado.");
     } catch (error) {
-
-        console.error(
-            "[Sharkord WS] erro ativando logger:",
-            error
-        );
+        console.error("[Sharkord WS] erro ativando logger:", error);
     }
 }
 
@@ -4874,64 +5037,6 @@ function registerMemberRolesPreload() {
 
 
 // ======================================================
-// UPDATER UI PRELOAD
-// ======================================================
-
-function registerUpdaterPreload() {
-
-    const updaterPreloadPath =
-        path.join(
-            __dirname,
-            "updater-preload.js"
-        );
-
-
-    if (
-        !fs.existsSync(
-            updaterPreloadPath
-        )
-    ) {
-
-        console.warn(
-            "[Updater UI] updater-preload.js não encontrado:",
-            updaterPreloadPath
-        );
-
-
-        return;
-    }
-
-
-    try {
-
-        session.defaultSession
-            .registerPreloadScript({
-                type:
-                    "frame",
-
-                id:
-                    "sharkord-updater-ui",
-
-                filePath:
-                updaterPreloadPath
-            });
-
-
-        console.log(
-            "[Updater UI] preload registrado."
-        );
-
-    } catch (error) {
-
-        console.error(
-            "[Updater UI] erro registrando preload:",
-            error
-        );
-    }
-}
-
-
-// ======================================================
 // ELECTRON READY
 // ======================================================
 
@@ -4949,34 +5054,30 @@ app.whenReady().then(
         }
 
 
-        registerBrandingPreload();
-
-
-        registerMemberRolesPreload();
-
-
-        registerUpdaterPreload();
+        // Layout, branding e member roles agora serão renderizados
+        // nativamente pelo React do Sharkord Client.
+        // As funções e a lógica main-side permanecem no arquivo,
+        // mas os preloads visuais antigos não são mais registrados.
+        //
+        // registerBrandingPreload();
+        // registerMemberRolesPreload();
 
 
         configureSharkordApiLogger();
 
 
-        screenShareManager =
-            setupScreenShareMain({
-                getMainWindow:
-                    () =>
-                        mainWindow,
-
-                getAppIcon,
-
-                applyWindowIcon,
-
-                baseDir:
-                __dirname
-            });
+        configureDisplayMediaHandler();
 
 
-        createServerWindow();
+        openDesktopStartPage()
+            .catch(
+                error => {
+                    console.error(
+                        "[Server Sidebar] erro abrindo desktop:",
+                        error
+                    );
+                }
+            );
 
 
         /*
@@ -4997,7 +5098,15 @@ app.whenReady().then(
                     0
                 ) {
 
-                    createServerWindow();
+                    openDesktopStartPage()
+                        .catch(
+                            error => {
+                                console.error(
+                                    "[Server Sidebar] erro reabrindo desktop:",
+                                    error
+                                );
+                            }
+                        );
                 }
             }
         );
@@ -5010,51 +5119,10 @@ app.whenReady().then(
 // ======================================================
 
 app.on(
-    "before-quit",
-    () => {
-
-        /*
-         * Esta flag é essencial: quando app.quit() tenta fechar
-         * a mainWindow, o handler "close" deve deixar a janela
-         * fechar normalmente em vez de chamar preventDefault().
-         */
-        appIsQuitting =
-            true;
-
-
-        cleanupBeforeExit(
-            "before-quit"
-        );
-    }
-);
-
-
-app.on(
     "will-quit",
     () => {
 
-        cleanupBeforeExit(
-            "will-quit"
-        );
-
-
-        if (
-            forceExitTimer
-        ) {
-
-            clearTimeout(
-                forceExitTimer
-            );
-
-
-            forceExitTimer =
-                null;
-        }
-
-
-        console.log(
-            "[Shutdown] Electron finalizando normalmente."
-        );
+        stopProcessAudio();
     }
 );
 
@@ -5068,9 +5136,7 @@ app.on(
             "darwin"
         ) {
 
-            requestAppShutdown(
-                "todas as janelas foram fechadas"
-            );
+            app.quit();
         }
     }
 );

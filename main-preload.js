@@ -3,6 +3,10 @@
 // Bootstrap modular e resiliente.
 // Cada responsabilidade vive em seu próprio módulo.
 // Um erro isolado não deve impedir os outros módulos de carregar.
+//
+// IMPORTANTE:
+// A antiga injeção visual da Server Sidebar foi removida deste bootstrap.
+// O layout agora deve ser controlado pelo source React do Sharkord Client.
 
 const modules = [
     {
@@ -24,6 +28,10 @@ const modules = [
     {
         name: "ScreenShare Main World",
         path: "./preload/screen-share-main-world"
+    },
+    {
+        name: "Server Rail API",
+        path: "./preload/server-rail-api"
     }
 ];
 

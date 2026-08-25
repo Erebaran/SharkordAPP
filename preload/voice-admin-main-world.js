@@ -2,826 +2,629 @@ const {
     contextBridge
 } = require("electron");
 
-
 contextBridge.executeInMainWorld({
-
     func: () => {
-
         if (
-            !Reflect.get(
+            Reflect.get(
                 window,
                 "__sharkordVoiceAdminDisconnectInstalled"
             )
         ) {
+            return;
+        }
 
-            Reflect.set(
-                window,
-                "__sharkordVoiceAdminDisconnectInstalled",
-                true
+        Reflect.set(
+            window,
+            "__sharkordVoiceAdminDisconnectInstalled",
+            true
+        );
+
+        const ROOT_ID =
+            "__sharkord_voice_admin_controls";
+
+        const FLYOUT_ID =
+            "__sharkord_voice_admin_roles_flyout";
+
+        let pendingUserId =
+            null;
+
+        let pendingRow =
+            null;
+
+        let sessionToken =
+            null;
+
+        let serverPassword =
+            null;
+
+        let generation =
+            0;
+
+        // ==================================================
+        // CAPTURA AUTENTICAÇÃO DO WEBSOCKET REAL DO SHARKORD
+        // ==================================================
+
+        const originalWebSocketSend =
+            WebSocket.prototype.send;
+
+        WebSocket.prototype.send =
+            function (data) {
+                try {
+                    if (
+                        typeof data ===
+                        "string"
+                    ) {
+                        const parsed =
+                            JSON.parse(data);
+
+                        const packets =
+                            Array.isArray(parsed)
+                                ? parsed
+                                : [parsed];
+
+                        for (
+                            const packet
+                            of packets
+                            ) {
+                            if (
+                                packet?.method ===
+                                "connectionParams" &&
+                                typeof packet?.data?.token ===
+                                "string"
+                            ) {
+                                sessionToken =
+                                    packet.data.token;
+                            }
+
+                            if (
+                                packet?.params?.path ===
+                                "others.joinServer"
+                            ) {
+                                const password =
+                                    packet?.params
+                                        ?.input
+                                        ?.password;
+
+                                if (
+                                    typeof password ===
+                                    "string"
+                                ) {
+                                    serverPassword =
+                                        password;
+                                }
+                            }
+                        }
+                    }
+                } catch {}
+
+                return originalWebSocketSend.apply(
+                    this,
+                    arguments
+                );
+            };
+
+        // ==================================================
+        // HELPERS
+        // ==================================================
+
+        function getErrorText(error) {
+            if (
+                typeof error ===
+                "string"
+            ) {
+                return error;
+            }
+
+            return (
+                error?.message ||
+                error?.data?.message ||
+                "Erro desconhecido."
+            );
+        }
+
+        function toast(
+            message,
+            isError = false
+        ) {
+            const element =
+                document.createElement(
+                    "div"
+                );
+
+            element.textContent =
+                message;
+
+            element.style.cssText = `
+                position:fixed;
+                right:18px;
+                bottom:18px;
+                z-index:2147483647;
+                max-width:380px;
+                padding:11px 14px;
+                border-radius:8px;
+                border:1px solid ${
+                isError
+                    ? "rgba(239,68,68,.45)"
+                    : "rgba(255,255,255,.14)"
+            };
+                background:#18181b;
+                color:${
+                isError
+                    ? "#fca5a5"
+                    : "#f4f4f5"
+            };
+                box-shadow:0 12px 35px rgba(0,0,0,.35);
+                font:500 13px/1.4 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+                pointer-events:none;
+            `;
+
+            document.body.appendChild(
+                element
             );
 
+            setTimeout(
+                () => element.remove(),
+                3200
+            );
+        }
 
-            const VOICE_ADMIN_MENU_ITEM_ID =
-                "__sharkord_disconnect_voice_user";
+        function unwrapResult(packet) {
+            return (
+                packet?.result
+                    ?.data
+                    ?.data ??
+                packet?.result
+                    ?.data ??
+                packet?.result ??
+                null
+            );
+        }
 
+        // ==================================================
+        // TRPC AUXILIAR AUTENTICADO
+        // ==================================================
 
-            let voiceAdminPendingUserId =
-                null;
+        function request(
+            method,
+            path,
+            input
+        ) {
+            return new Promise(
+                (
+                    resolve,
+                    reject
+                ) => {
+                    if (
+                        !sessionToken
+                    ) {
+                        reject(
+                            new Error(
+                                "Token da sessão ainda não foi capturado. Reconecte ao servidor e tente novamente."
+                            )
+                        );
 
+                        return;
+                    }
 
-            let voiceAdminPendingRow =
-                null;
+                    const websocketUrl =
+                        new URL(
+                            location.origin
+                        );
 
+                    websocketUrl.protocol =
+                        websocketUrl.protocol ===
+                        "https:"
+                            ? "wss:"
+                            : "ws:";
 
-            let voiceAdminToken =
-                null;
+                    websocketUrl.search =
+                        "?connectionParams=1";
 
+                    const socket =
+                        new WebSocket(
+                            websocketUrl.toString()
+                        );
 
-            let voiceAdminPassword =
-                null;
+                    const handshakeId =
+                        91001;
 
+                    const joinId =
+                        91002;
 
-            /*
-             * O preload roda antes do app React. Aproveitamos isso para
-             * observar as mensagens tRPC/WebSocket que o próprio Sharkord
-             * envia e guardar apenas os dados necessários para uma conexão
-             * auxiliar autenticada.
-             */
-            const originalWebSocketSend =
-                WebSocket.prototype.send;
+                    const actionId =
+                        91003;
 
+                    let settled =
+                        false;
 
-            WebSocket.prototype.send =
-                function (
-                    data
-                ) {
+                    const finish =
+                        (
+                            error,
+                            value
+                        ) => {
+                            if (
+                                settled
+                            ) {
+                                return;
+                            }
 
-                    try {
+                            settled =
+                                true;
 
-                        if (
-                            typeof data ===
-                            "string"
-                        ) {
+                            clearTimeout(
+                                timeout
+                            );
 
-                            const parsed =
-                                JSON.parse(
-                                    data
+                            try {
+                                socket.close();
+                            } catch {}
+
+                            if (
+                                error
+                            ) {
+                                reject(error);
+                            } else {
+                                resolve(value);
+                            }
+                        };
+
+                    const timeout =
+                        setTimeout(
+                            () => {
+                                finish(
+                                    new Error(
+                                        "O servidor demorou demais para responder."
+                                    )
                                 );
+                            },
+                            15000
+                        );
 
+                    socket.addEventListener(
+                        "open",
+                        () => {
+                            socket.send(
+                                JSON.stringify({
+                                    method:
+                                        "connectionParams",
+
+                                    data: {
+                                        token:
+                                        sessionToken
+                                    }
+                                })
+                            );
+
+                            socket.send(
+                                JSON.stringify({
+                                    id:
+                                    handshakeId,
+
+                                    method:
+                                        "query",
+
+                                    params: {
+                                        path:
+                                            "others.handshake"
+                                    }
+                                })
+                            );
+                        }
+                    );
+
+                    socket.addEventListener(
+                        "message",
+                        event => {
+                            let parsed;
+
+                            try {
+                                parsed =
+                                    JSON.parse(
+                                        String(
+                                            event.data ||
+                                            ""
+                                        )
+                                    );
+                            } catch {
+                                return;
+                            }
 
                             const packets =
-                                Array.isArray(
-                                    parsed
-                                )
+                                Array.isArray(parsed)
                                     ? parsed
-                                    : [
-                                        parsed
-                                    ];
-
+                                    : [parsed];
 
                             for (
                                 const packet
                                 of packets
                                 ) {
-
                                 if (
-                                    packet?.method ===
-                                    "connectionParams" &&
-                                    typeof packet?.data?.token ===
-                                    "string"
+                                    packet?.id ===
+                                    handshakeId
                                 ) {
-
-                                    voiceAdminToken =
-                                        packet.data.token;
-                                }
-
-
-                                if (
-                                    packet?.params?.path ===
-                                    "others.joinServer"
-                                ) {
-
-                                    const password =
-                                        packet?.params
-                                            ?.input
-                                            ?.password;
-
-
-                                    if (
-                                        typeof password ===
-                                        "string"
-                                    ) {
-
-                                        voiceAdminPassword =
-                                            password;
-                                    }
-                                }
-                            }
-                        }
-
-                    } catch {}
-
-
-                    return originalWebSocketSend.apply(
-                        this,
-                        arguments
-                    );
-                };
-
-
-            function voiceAdminGetErrorText(
-                error
-            ) {
-
-                if (
-                    typeof error ===
-                    "string"
-                ) {
-                    return error;
-                }
-
-
-                return (
-                    error?.message ||
-                    error?.data?.message ||
-                    "Erro desconhecido."
-                );
-            }
-
-
-            function voiceAdminToast(
-                message,
-                isError = false
-            ) {
-
-                const toast =
-                    document.createElement(
-                        "div"
-                    );
-
-
-                toast.textContent =
-                    message;
-
-
-                toast.style.cssText = `
-                    position:fixed;
-                    right:18px;
-                    bottom:18px;
-                    z-index:2147483647;
-                    max-width:360px;
-                    padding:11px 14px;
-                    border-radius:8px;
-                    border:1px solid ${
-                    isError
-                        ? "rgba(239,68,68,.45)"
-                        : "rgba(255,255,255,.14)"
-                };
-                    background:#18181b;
-                    color:${
-                    isError
-                        ? "#fca5a5"
-                        : "#f4f4f5"
-                };
-                    box-shadow:0 12px 35px rgba(0,0,0,.35);
-                    font:500 13px/1.4 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
-                    pointer-events:none;
-                `;
-
-
-                document.body.appendChild(
-                    toast
-                );
-
-
-                setTimeout(
-                    () => {
-
-                        toast.remove();
-                    },
-                    3200
-                );
-            }
-
-
-            function voiceAdminMutation(
-                path,
-                input
-            ) {
-
-                return new Promise(
-                    (
-                        resolve,
-                        reject
-                    ) => {
-
-                        if (
-                            !voiceAdminToken
-                        ) {
-
-                            reject(
-                                new Error(
-                                    "Token da sessão ainda não foi capturado. Reconecte ao servidor e tente novamente."
-                                )
-                            );
-
-
-                            return;
-                        }
-
-
-                        const websocketUrl =
-                            new URL(
-                                location.origin
-                            );
-
-
-                        websocketUrl.protocol =
-                            websocketUrl.protocol ===
-                            "https:"
-                                ? "wss:"
-                                : "ws:";
-
-
-                        websocketUrl.search =
-                            "?connectionParams=1";
-
-
-                        const socket =
-                            new WebSocket(
-                                websocketUrl.toString()
-                            );
-
-
-                        const handshakeId =
-                            91001;
-
-                        const joinId =
-                            91002;
-
-                        const mutationId =
-                            91003;
-
-
-                        let settled =
-                            false;
-
-                        let handshakeData =
-                            null;
-
-
-                        const finish =
-                            (
-                                error,
-                                value
-                            ) => {
-
-                                if (
-                                    settled
-                                ) {
-                                    return;
-                                }
-
-
-                                settled =
-                                    true;
-
-
-                                clearTimeout(
-                                    timeout
-                                );
-
-
-                                try {
-
-                                    socket.close();
-
-                                } catch {}
-
-
-                                if (
-                                    error
-                                ) {
-
-                                    reject(
-                                        error
-                                    );
-
-                                } else {
-
-                                    resolve(
-                                        value
-                                    );
-                                }
-                            };
-
-
-                        const timeout =
-                            setTimeout(
-                                () => {
-
-                                    finish(
-                                        new Error(
-                                            "O servidor demorou demais para responder."
-                                        )
-                                    );
-                                },
-                                15000
-                            );
-
-
-                        socket.addEventListener(
-                            "open",
-                            () => {
-
-                                socket.send(
-                                    JSON.stringify({
-                                        method:
-                                            "connectionParams",
-
-                                        data: {
-                                            token:
-                                            voiceAdminToken
-                                        }
-                                    })
-                                );
-
-
-                                socket.send(
-                                    JSON.stringify({
-                                        id:
-                                        handshakeId,
-
-                                        method:
-                                            "query",
-
-                                        params: {
-                                            path:
-                                                "others.handshake"
-                                        }
-                                    })
-                                );
-                            }
-                        );
-
-
-                        socket.addEventListener(
-                            "message",
-                            event => {
-
-                                let parsed;
-
-
-                                try {
-
-                                    parsed =
-                                        JSON.parse(
-                                            String(
-                                                event.data ||
-                                                ""
-                                            )
-                                        );
-
-                                } catch {
-
-                                    return;
-                                }
-
-
-                                const packets =
-                                    Array.isArray(
-                                        parsed
-                                    )
-                                        ? parsed
-                                        : [
-                                            parsed
-                                        ];
-
-
-                                for (
-                                    const packet
-                                    of packets
-                                    ) {
-
-                                    if (
-                                        packet?.id ===
-                                        handshakeId
-                                    ) {
-
-                                        if (
-                                            packet?.error
-                                        ) {
-
-                                            finish(
-                                                new Error(
-                                                    packet.error
-                                                        ?.message ||
-                                                    "Falha no handshake."
-                                                )
-                                            );
-
-
-                                            return;
-                                        }
-
-
-                                        handshakeData =
-                                            packet?.result
-                                                ?.data
-                                                ?.data ||
-                                            packet?.result
-                                                ?.data;
-
-
-                                        const handshakeHash =
-                                            handshakeData
-                                                ?.handshakeHash;
-
-
-                                        if (
-                                            !handshakeHash
-                                        ) {
-
-                                            finish(
-                                                new Error(
-                                                    "Handshake inválido."
-                                                )
-                                            );
-
-
-                                            return;
-                                        }
-
-
-                                        const joinInput = {
-                                            handshakeHash
-                                        };
-
-
-                                        if (
-                                            handshakeData
-                                                ?.hasPassword
-                                        ) {
-
-                                            if (
-                                                !voiceAdminPassword
-                                            ) {
-
-                                                finish(
-                                                    new Error(
-                                                        "Senha do servidor não foi capturada. Reconecte ao servidor e tente novamente."
-                                                    )
-                                                );
-
-
-                                                return;
-                                            }
-
-
-                                            joinInput.password =
-                                                voiceAdminPassword;
-                                        }
-
-
-                                        socket.send(
-                                            JSON.stringify({
-                                                id:
-                                                joinId,
-
-                                                method:
-                                                    "query",
-
-                                                params: {
-                                                    input:
-                                                    joinInput,
-
-                                                    path:
-                                                        "others.joinServer"
-                                                }
-                                            })
-                                        );
-
-
-                                        continue;
-                                    }
-
-
-                                    if (
-                                        packet?.id ===
-                                        joinId
-                                    ) {
-
-                                        if (
-                                            packet?.error
-                                        ) {
-
-                                            finish(
-                                                new Error(
-                                                    packet.error
-                                                        ?.message ||
-                                                    "Falha ao autenticar a conexão auxiliar."
-                                                )
-                                            );
-
-
-                                            return;
-                                        }
-
-
-                                        if (
-                                            packet?.result
-                                        ) {
-
-                                            socket.send(
-                                                JSON.stringify({
-                                                    id:
-                                                    mutationId,
-
-                                                    method:
-                                                        "mutation",
-
-                                                    params: {
-                                                        input,
-                                                        path
-                                                    }
-                                                })
-                                            );
-                                        }
-
-
-                                        continue;
-                                    }
-
-
-                                    if (
-                                        packet?.id !==
-                                        mutationId
-                                    ) {
-                                        continue;
-                                    }
-
-
                                     if (
                                         packet?.error
                                     ) {
-
                                         finish(
                                             new Error(
                                                 packet.error
                                                     ?.message ||
-                                                packet.error
-                                                    ?.data
-                                                    ?.message ||
-                                                "O servidor recusou a ação."
+                                                "Falha no handshake."
                                             )
                                         );
 
-
                                         return;
                                     }
 
-
-                                    if (
-                                        packet?.result
-                                    ) {
-
-                                        finish(
-                                            null,
-                                            packet.result
+                                    const handshakeData =
+                                        unwrapResult(
+                                            packet
                                         );
 
+                                    const handshakeHash =
+                                        handshakeData
+                                            ?.handshakeHash;
+
+                                    if (
+                                        !handshakeHash
+                                    ) {
+                                        finish(
+                                            new Error(
+                                                "Handshake inválido."
+                                            )
+                                        );
 
                                         return;
                                     }
+
+                                    const joinInput = {
+                                        handshakeHash
+                                    };
+
+                                    if (
+                                        handshakeData
+                                            ?.hasPassword
+                                    ) {
+                                        if (
+                                            !serverPassword
+                                        ) {
+                                            finish(
+                                                new Error(
+                                                    "Senha do servidor não foi capturada. Reconecte ao servidor e tente novamente."
+                                                )
+                                            );
+
+                                            return;
+                                        }
+
+                                        joinInput.password =
+                                            serverPassword;
+                                    }
+
+                                    socket.send(
+                                        JSON.stringify({
+                                            id:
+                                            joinId,
+
+                                            method:
+                                                "query",
+
+                                            params: {
+                                                input:
+                                                joinInput,
+
+                                                path:
+                                                    "others.joinServer"
+                                            }
+                                        })
+                                    );
+
+                                    continue;
+                                }
+
+                                if (
+                                    packet?.id ===
+                                    joinId
+                                ) {
+                                    if (
+                                        packet?.error
+                                    ) {
+                                        finish(
+                                            new Error(
+                                                packet.error
+                                                    ?.message ||
+                                                "Falha ao autenticar a conexão auxiliar."
+                                            )
+                                        );
+
+                                        return;
+                                    }
+
+                                    const params = {
+                                        path
+                                    };
+
+                                    if (
+                                        input !==
+                                        undefined
+                                    ) {
+                                        params.input =
+                                            input;
+                                    }
+
+                                    socket.send(
+                                        JSON.stringify({
+                                            id:
+                                            actionId,
+
+                                            method,
+
+                                            params
+                                        })
+                                    );
+
+                                    continue;
+                                }
+
+                                if (
+                                    packet?.id !==
+                                    actionId
+                                ) {
+                                    continue;
+                                }
+
+                                if (
+                                    packet?.error
+                                ) {
+                                    finish(
+                                        new Error(
+                                            packet.error
+                                                ?.message ||
+                                            packet.error
+                                                ?.data
+                                                ?.message ||
+                                            "O servidor recusou a ação."
+                                        )
+                                    );
+
+                                    return;
+                                }
+
+                                if (
+                                    packet?.result
+                                ) {
+                                    finish(
+                                        null,
+                                        unwrapResult(
+                                            packet
+                                        )
+                                    );
+
+                                    return;
                                 }
                             }
-                        );
+                        }
+                    );
 
+                    socket.addEventListener(
+                        "error",
+                        () => {
+                            finish(
+                                new Error(
+                                    "Falha na conexão WebSocket auxiliar."
+                                )
+                            );
+                        }
+                    );
 
-                        socket.addEventListener(
-                            "error",
-                            () => {
-
+                    socket.addEventListener(
+                        "close",
+                        () => {
+                            if (
+                                !settled
+                            ) {
                                 finish(
                                     new Error(
-                                        "Falha na conexão WebSocket auxiliar."
+                                        "A conexão foi encerrada antes da confirmação."
                                     )
                                 );
                             }
-                        );
+                        }
+                    );
+                }
+            );
+        }
 
+        function query(
+            path,
+            input
+        ) {
+            return request(
+                "query",
+                path,
+                input
+            );
+        }
 
-                        socket.addEventListener(
-                            "close",
-                            () => {
+        function mutation(
+            path,
+            input
+        ) {
+            return request(
+                "mutation",
+                path,
+                input
+            );
+        }
 
-                                if (
-                                    !settled
-                                ) {
+        // ==================================================
+        // LOCALIZAÇÃO DO USUÁRIO / POPUP
+        // ==================================================
 
-                                    finish(
-                                        new Error(
-                                            "A conexão foi encerrada antes da confirmação."
-                                        )
-                                    );
-                                }
-                            }
-                        );
-                    }
-                );
+        function findVoiceRow(
+            startNode
+        ) {
+            let node =
+                startNode instanceof Element
+                    ? startNode
+                    : startNode?.parentElement;
+
+            for (
+                let depth = 0;
+                node &&
+                depth < 10;
+                depth += 1,
+                    node = node.parentElement
+            ) {
+                const className =
+                    typeof node.className ===
+                    "string"
+                        ? node.className
+                        : "";
+
+                if (
+                    className.includes(
+                        "hover:bg-accent/30"
+                    ) &&
+                    className.includes(
+                        "px-2"
+                    ) &&
+                    className.includes(
+                        "py-1"
+                    )
+                ) {
+                    return node;
+                }
             }
 
+            return null;
+        }
 
-            function voiceAdminFindRow(
-                startNode
+        function findUserId(
+            value,
+            depth = 0,
+            seen = new WeakSet()
+        ) {
+            if (
+                value == null ||
+                depth > 8
             ) {
-
-                let node =
-                    startNode instanceof Element
-                        ? startNode
-                        : startNode?.parentElement;
-
-
-                for (
-                    let depth = 0;
-                    node &&
-                    depth < 10;
-                    depth += 1,
-                        node = node.parentElement
-                ) {
-
-                    const className =
-                        typeof node.className ===
-                        "string"
-                            ? node.className
-                            : "";
-
-
-                    if (
-                        className.includes(
-                            "hover:bg-accent/30"
-                        ) &&
-                        className.includes(
-                            "px-2"
-                        ) &&
-                        className.includes(
-                            "py-1"
-                        )
-                    ) {
-
-                        return node;
-                    }
-                }
-
-
                 return null;
             }
 
-
-            function voiceAdminFindUserId(
-                value,
-                depth = 0,
-                seen = new WeakSet()
+            if (
+                Array.isArray(value)
             ) {
-
-                if (
-                    value == null ||
-                    depth > 8
-                ) {
-                    return null;
-                }
-
-
-                if (
-                    Array.isArray(
-                        value
-                    )
-                ) {
-
-                    for (
-                        const item
-                        of value
-                        ) {
-
-                        const found =
-                            voiceAdminFindUserId(
-                                item,
-                                depth + 1,
-                                seen
-                            );
-
-
-                        if (
-                            found
-                        ) {
-                            return found;
-                        }
-                    }
-
-
-                    return null;
-                }
-
-
-                if (
-                    typeof value !==
-                    "object"
-                ) {
-                    return null;
-                }
-
-
-                if (
-                    seen.has(
-                        value
-                    )
-                ) {
-                    return null;
-                }
-
-
-                seen.add(
-                    value
-                );
-
-
-                if (
-                    Number.isInteger(
-                        value.userId
-                    ) &&
-                    value.userId > 0
-                ) {
-
-                    return value.userId;
-                }
-
-
-                if (
-                    Number.isInteger(
-                        value.user?.id
-                    ) &&
-                    value.user.id > 0
-                ) {
-
-                    return value.user.id;
-                }
-
-
-                if (
-                    Number.isInteger(
-                        value.voiceUser?.id
-                    ) &&
-                    value.voiceUser.id > 0
-                ) {
-
-                    return value.voiceUser.id;
-                }
-
-
-                /*
-                 * No VoiceUser atual, o userId fica em:
-                 *
-                 * __reactProps$... -> children[0] -> props -> userId
-                 *
-                 * Percorremos primeiro os campos mais prováveis.
-                 */
-                const preferredKeys = [
-                    "props",
-                    "children",
-                    "memoizedProps",
-                    "pendingProps",
-                    "return",
-                    "child",
-                    "sibling"
-                ];
-
-
                 for (
-                    const key
-                    of preferredKeys
+                    const item
+                    of value
                     ) {
-
-                    let nested;
-
-
-                    try {
-
-                        nested =
-                            value[key];
-
-                    } catch {
-
-                        continue;
-                    }
-
-
                     const found =
-                        voiceAdminFindUserId(
-                            nested,
+                        findUserId(
+                            item,
                             depth + 1,
                             seen
                         );
-
 
                     if (
                         found
@@ -830,523 +633,1180 @@ contextBridge.executeInMainWorld({
                     }
                 }
 
-
                 return null;
             }
 
-
-            function voiceAdminGetUserIdFromRow(
-                row
+            if (
+                typeof value !==
+                "object"
             ) {
+                return null;
+            }
 
-                /*
-                 * Caminho rápido e estável para a estrutura real observada
-                 * no Sharkord:
-                 *
-                 * row.__reactProps$...children[0].props.userId
-                 */
+            if (
+                seen.has(value)
+            ) {
+                return null;
+            }
+
+            seen.add(value);
+
+            if (
+                Number.isInteger(
+                    value.userId
+                ) &&
+                value.userId > 0
+            ) {
+                return value.userId;
+            }
+
+            if (
+                Number.isInteger(
+                    value.user?.id
+                ) &&
+                value.user.id > 0
+            ) {
+                return value.user.id;
+            }
+
+            if (
+                Number.isInteger(
+                    value.voiceUser?.id
+                ) &&
+                value.voiceUser.id > 0
+            ) {
+                return value.voiceUser.id;
+            }
+
+            const preferredKeys = [
+                "props",
+                "children",
+                "memoizedProps",
+                "pendingProps",
+                "return",
+                "child",
+                "sibling"
+            ];
+
+            for (
+                const key
+                of preferredKeys
+                ) {
+                let nested;
+
                 try {
+                    nested =
+                        value[key];
+                } catch {
+                    continue;
+                }
 
-                    const reactPropsKey =
-                        Object.getOwnPropertyNames(
-                            row
-                        ).find(
-                            key =>
-                                key.startsWith(
-                                    "__reactProps$"
-                                )
-                        );
+                const found =
+                    findUserId(
+                        nested,
+                        depth + 1,
+                        seen
+                    );
 
+                if (
+                    found
+                ) {
+                    return found;
+                }
+            }
+
+            return null;
+        }
+
+        function getUserIdFromRow(
+            row
+        ) {
+            try {
+                const reactPropsKey =
+                    Object.getOwnPropertyNames(
+                        row
+                    ).find(
+                        key =>
+                            key.startsWith(
+                                "__reactProps$"
+                            )
+                    );
+
+                if (
+                    reactPropsKey
+                ) {
+                    const props =
+                        row[
+                            reactPropsKey
+                            ];
+
+                    const directUserId =
+                        props?.children?.[0]
+                            ?.props?.userId;
 
                     if (
-                        reactPropsKey
+                        Number.isInteger(
+                            directUserId
+                        ) &&
+                        directUserId > 0
                     ) {
+                        console.log(
+                            "[Voice Admin] userId identificado pelas React props:",
+                            directUserId
+                        );
 
-                        const props =
-                            row[
-                                reactPropsKey
-                                ];
-
-
-                        const directUserId =
-                            props?.children?.[0]
-                                ?.props?.userId;
-
-
-                        if (
-                            Number.isInteger(
-                                directUserId
-                            ) &&
-                            directUserId > 0
-                        ) {
-
-                            console.log(
-                                "[Voice Admin] userId identificado pelas React props:",
-                                directUserId
-                            );
-
-
-                            return directUserId;
-                        }
-
-
-                        const foundInProps =
-                            voiceAdminFindUserId(
-                                props
-                            );
-
-
-                        if (
-                            foundInProps
-                        ) {
-
-                            console.log(
-                                "[Voice Admin] userId identificado recursivamente nas React props:",
-                                foundInProps
-                            );
-
-
-                            return foundInProps;
-                        }
+                        return directUserId;
                     }
 
-                } catch (
-                    error
+                    const foundInProps =
+                        findUserId(
+                            props
+                        );
+
+                    if (
+                        foundInProps
                     ) {
-
-                    console.warn(
-                        "[Voice Admin] falha ao ler React props da linha:",
-                        error
-                    );
+                        return foundInProps;
+                    }
                 }
+            } catch (
+                error
+                ) {
+                console.warn(
+                    "[Voice Admin] falha ao ler React props da linha:",
+                    error
+                );
+            }
 
+            let node =
+                row;
 
-                /*
-                 * Fallback: procura também no Fiber e nos pais próximos.
-                 */
-                let node =
-                    row;
+            for (
+                let depth = 0;
+                node &&
+                depth < 8;
+                depth += 1,
+                    node = node.parentElement
+            ) {
+                let keys = [];
 
+                try {
+                    keys =
+                        Object.getOwnPropertyNames(
+                            node
+                        );
+                } catch {}
 
                 for (
-                    let depth = 0;
-                    node &&
-                    depth < 8;
-                    depth += 1,
-                        node = node.parentElement
-                ) {
+                    const key
+                    of keys
+                    ) {
+                    if (
+                        !key.startsWith(
+                            "__reactProps$"
+                        ) &&
+                        !key.startsWith(
+                            "__reactFiber$"
+                        )
+                    ) {
+                        continue;
+                    }
 
-                    let keys = [];
-
+                    let payload;
 
                     try {
+                        payload =
+                            node[key];
+                    } catch {
+                        continue;
+                    }
 
-                        keys =
-                            Object.getOwnPropertyNames(
-                                node
-                            );
+                    const found =
+                        findUserId(
+                            payload
+                        );
 
-                    } catch {}
-
-
-                    for (
-                        const key
-                        of keys
-                        ) {
-
-                        if (
-                            !key.startsWith(
-                                "__reactProps$"
-                            ) &&
-                            !key.startsWith(
-                                "__reactFiber$"
-                            )
-                        ) {
-                            continue;
-                        }
-
-
-                        let payload;
-
-
-                        try {
-
-                            payload =
-                                node[
-                                    key
-                                    ];
-
-                        } catch {
-
-                            continue;
-                        }
-
-
-                        const found =
-                            voiceAdminFindUserId(
-                                payload
-                            );
-
-
-                        if (
-                            found
-                        ) {
-
-                            console.log(
-                                "[Voice Admin] userId identificado pelo fallback React:",
-                                found
-                            );
-
-
-                            return found;
-                        }
+                    if (
+                        found
+                    ) {
+                        return found;
                     }
                 }
+            }
 
+            return null;
+        }
 
+        function getControlledPopup(
+            row
+        ) {
+            if (
+                !row
+            ) {
                 return null;
             }
 
+            const controlledId =
+                row.getAttribute(
+                    "aria-controls"
+                );
 
-            function voiceAdminGetControlledPopup(
-                row
+            if (
+                !controlledId
             ) {
-
-                if (
-                    !row
-                ) {
-                    return null;
-                }
-
-
-                const controlledId =
-                    row.getAttribute(
-                        "aria-controls"
-                    );
-
-
-                if (
-                    !controlledId
-                ) {
-                    return null;
-                }
-
-
-                const popup =
-                    document.getElementById(
-                        controlledId
-                    );
-
-
-                if (
-                    !popup
-                ) {
-                    return null;
-                }
-
-
-                const rect =
-                    popup.getBoundingClientRect();
-
-
-                if (
-                    rect.width <= 0 ||
-                    rect.height <= 0
-                ) {
-                    return null;
-                }
-
-
-                return popup;
+                return null;
             }
 
+            const popup =
+                document.getElementById(
+                    controlledId
+                );
 
-            function voiceAdminInstallMenuItem() {
+            if (
+                !popup
+            ) {
+                return null;
+            }
 
-                if (
-                    !voiceAdminPendingUserId ||
-                    document.getElementById(
-                        VOICE_ADMIN_MENU_ITEM_ID
+            const rect =
+                popup.getBoundingClientRect();
+
+            if (
+                rect.width <= 0 ||
+                rect.height <= 0
+            ) {
+                return null;
+            }
+
+            return popup;
+        }
+
+        // ==================================================
+        // COMPONENTES VISUAIS
+        // ==================================================
+
+        function makeSeparator() {
+            const separator =
+                document.createElement(
+                    "div"
+                );
+
+            separator.style.cssText = `
+                height:1px;
+                margin:5px 6px;
+                background:rgba(255,255,255,.08);
+                pointer-events:none;
+            `;
+
+            return separator;
+        }
+
+        function makeButton(
+            label,
+            {
+                danger = false,
+                checked = null,
+                suffix = ""
+            } = {}
+        ) {
+            const button =
+                document.createElement(
+                    "button"
+                );
+
+            button.type =
+                "button";
+
+            button.setAttribute(
+                "role",
+                "menuitem"
+            );
+
+            button.style.cssText = `
+                width:calc(100% - 12px);
+                min-height:32px;
+                margin:2px 6px;
+                padding:6px 8px;
+                display:flex;
+                align-items:center;
+                gap:8px;
+                border:0;
+                border-radius:5px;
+                background:transparent;
+                color:${
+                danger
+                    ? "#ef4444"
+                    : "inherit"
+            };
+                font:500 13px/1.2 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+                text-align:left;
+                cursor:pointer;
+                outline:none;
+            `;
+
+            const check =
+                document.createElement(
+                    "span"
+                );
+
+            check.style.cssText = `
+                width:15px;
+                flex:0 0 15px;
+                text-align:center;
+                opacity:.9;
+            `;
+
+            check.textContent =
+                checked === null
+                    ? ""
+                    : checked
+                        ? "✓"
+                        : "";
+
+            const text =
+                document.createElement(
+                    "span"
+                );
+
+            text.textContent =
+                label;
+
+            text.style.cssText = `
+                flex:1 1 auto;
+                min-width:0;
+                overflow:hidden;
+                text-overflow:ellipsis;
+                white-space:nowrap;
+            `;
+
+            const right =
+                document.createElement(
+                    "span"
+                );
+
+            right.textContent =
+                suffix;
+
+            right.style.cssText = `
+                flex:0 0 auto;
+                opacity:.65;
+            `;
+
+            button.append(
+                check,
+                text,
+                right
+            );
+
+            button.addEventListener(
+                "mouseenter",
+                () => {
+                    button.style.background =
+                        danger
+                            ? "rgba(239,68,68,.12)"
+                            : "rgba(255,255,255,.08)";
+                }
+            );
+
+            button.addEventListener(
+                "mouseleave",
+                () => {
+                    button.style.background =
+                        "transparent";
+                }
+            );
+
+            button.addEventListener(
+                "pointerdown",
+                event => {
+                    event.stopPropagation();
+                }
+            );
+
+            return button;
+        }
+
+        function setBusy(
+            button,
+            busy
+        ) {
+            button.disabled =
+                busy;
+
+            button.style.opacity =
+                busy
+                    ? "0.55"
+                    : "1";
+        }
+
+        function closeRolesFlyout() {
+            document.getElementById(
+                FLYOUT_ID
+            )?.remove();
+        }
+
+        async function openRolesFlyout(
+            anchor,
+            userId
+        ) {
+            closeRolesFlyout();
+
+            const flyout =
+                document.createElement(
+                    "div"
+                );
+
+            flyout.id =
+                FLYOUT_ID;
+
+            flyout.style.cssText = `
+                position:fixed;
+                z-index:2147483646;
+                min-width:220px;
+                max-width:320px;
+                max-height:360px;
+                overflow:auto;
+                padding:6px 0;
+                border:1px solid rgba(255,255,255,.10);
+                border-radius:7px;
+                background:#18181b;
+                color:#f4f4f5;
+                box-shadow:0 16px 42px rgba(0,0,0,.45);
+                font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+            `;
+
+            const rect =
+                anchor.getBoundingClientRect();
+
+            flyout.style.left =
+                `${Math.min(
+                    rect.right + 6,
+                    window.innerWidth - 330
+                )}px`;
+
+            flyout.style.top =
+                `${Math.min(
+                    rect.top,
+                    window.innerHeight - 370
+                )}px`;
+
+            const loading =
+                document.createElement(
+                    "div"
+                );
+
+            loading.textContent =
+                "Carregando cargos...";
+
+            loading.style.cssText = `
+                padding:8px 12px;
+                color:#a1a1aa;
+                font-size:12px;
+            `;
+
+            flyout.appendChild(
+                loading
+            );
+
+            document.body.appendChild(
+                flyout
+            );
+
+            try {
+                const data =
+                    await query(
+                        "users.getRoles",
+                        {
+                            userId
+                        }
+                    );
+
+                flyout.replaceChildren();
+
+                const roles =
+                    Array.isArray(
+                        data?.roles
                     )
-                ) {
-                    return;
-                }
+                        ? data.roles
+                        : [];
 
-
-                const menu =
-                    voiceAdminGetControlledPopup(
-                        voiceAdminPendingRow
+                const assigned =
+                    new Set(
+                        (
+                            Array.isArray(
+                                data?.userRoleIds
+                            )
+                                ? data.userRoleIds
+                                : []
+                        ).map(Number)
                     );
-
 
                 if (
-                    !menu
+                    roles.length === 0
                 ) {
+                    const empty =
+                        document.createElement(
+                            "div"
+                        );
 
-                    setTimeout(
-                        voiceAdminInstallMenuItem,
-                        25
+                    empty.textContent =
+                        "Nenhum cargo disponível.";
+
+                    empty.style.cssText = `
+                        padding:8px 12px;
+                        color:#a1a1aa;
+                        font-size:12px;
+                    `;
+
+                    flyout.appendChild(
+                        empty
                     );
-
 
                     return;
                 }
 
+                for (
+                    const role
+                    of roles
+                    ) {
+                    const roleId =
+                        Number(
+                            role?.id
+                        );
 
-                const separator =
+                    if (
+                        !Number.isInteger(
+                            roleId
+                        )
+                    ) {
+                        continue;
+                    }
+
+                    const hasRole =
+                        assigned.has(
+                            roleId
+                        );
+
+                    const button =
+                        makeButton(
+                            role?.name ||
+                            `Cargo ${roleId}`,
+                            {
+                                checked:
+                                hasRole
+                            }
+                        );
+
+                    if (
+                        typeof role?.color ===
+                        "string" &&
+                        role.color
+                    ) {
+                        button.style.color =
+                            role.color;
+                    }
+
+                    button.addEventListener(
+                        "click",
+                        async event => {
+                            event.preventDefault();
+                            event.stopPropagation();
+
+                            setBusy(
+                                button,
+                                true
+                            );
+
+                            try {
+                                if (
+                                    hasRole
+                                ) {
+                                    await mutation(
+                                        "users.removeRole",
+                                        {
+                                            userId,
+                                            roleId
+                                        }
+                                    );
+
+                                    toast(
+                                        "Cargo removido."
+                                    );
+                                } else {
+                                    await mutation(
+                                        "users.addRole",
+                                        {
+                                            userId,
+                                            roleId
+                                        }
+                                    );
+
+                                    toast(
+                                        "Cargo adicionado."
+                                    );
+                                }
+
+                                await openRolesFlyout(
+                                    anchor,
+                                    userId
+                                );
+                            } catch (
+                                error
+                                ) {
+                                toast(
+                                    getErrorText(
+                                        error
+                                    ),
+                                    true
+                                );
+
+                                setBusy(
+                                    button,
+                                    false
+                                );
+                            }
+                        }
+                    );
+
+                    flyout.appendChild(
+                        button
+                    );
+                }
+            } catch (
+                error
+                ) {
+                flyout.replaceChildren();
+
+                const failed =
                     document.createElement(
                         "div"
                     );
 
-
-                separator.style.cssText = `
-                    height:1px;
-                    margin:5px 6px;
-                    background:rgba(255,255,255,.08);
-                    pointer-events:none;
-                `;
-
-
-                const item =
-                    document.createElement(
-                        "button"
+                failed.textContent =
+                    getErrorText(
+                        error
                     );
 
-
-                item.id =
-                    VOICE_ADMIN_MENU_ITEM_ID;
-
-                item.type =
-                    "button";
-
-                item.setAttribute(
-                    "role",
-                    "menuitem"
-                );
-
-
-                item.textContent =
-                    "Desconectar da chamada";
-
-
-                item.style.cssText = `
-                    width:calc(100% - 12px);
-                    min-height:32px;
-                    margin:3px 6px 6px;
-                    padding:6px 8px;
-                    display:flex;
-                    align-items:center;
-                    border:0;
-                    border-radius:5px;
-                    background:transparent;
-                    color:#ef4444;
-                    font:500 13px/1.2 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
-                    text-align:left;
-                    cursor:pointer;
-                    outline:none;
+                failed.style.cssText = `
+                    padding:8px 12px;
+                    color:#fca5a5;
+                    font-size:12px;
                 `;
 
+                flyout.appendChild(
+                    failed
+                );
+            }
+        }
 
-                item.addEventListener(
-                    "mouseenter",
-                    () => {
+        // ==================================================
+        // MENU ADMIN
+        // ==================================================
 
-                        item.style.background =
-                            "rgba(239,68,68,.12)";
+        async function installMenu(
+            expectedGeneration
+        ) {
+            if (
+                expectedGeneration !==
+                generation ||
+                !pendingUserId
+            ) {
+                return;
+            }
+
+            const previous =
+                document.getElementById(
+                    ROOT_ID
+                );
+
+            if (
+                previous
+            ) {
+                previous.remove();
+            }
+
+            const menu =
+                getControlledPopup(
+                    pendingRow
+                );
+
+            if (
+                !menu
+            ) {
+                setTimeout(
+                    () =>
+                        installMenu(
+                            expectedGeneration
+                        ),
+                    25
+                );
+
+                return;
+            }
+
+            const userId =
+                pendingUserId;
+
+            const root =
+                document.createElement(
+                    "div"
+                );
+
+            root.id =
+                ROOT_ID;
+
+            root.appendChild(
+                makeSeparator()
+            );
+
+            // ------------------------------
+            // CARGOS
+            // ------------------------------
+
+            const rolesButton =
+                makeButton(
+                    "Cargos",
+                    {
+                        suffix:
+                            "›"
                     }
                 );
 
+            rolesButton.addEventListener(
+                "click",
+                async event => {
+                    event.preventDefault();
+                    event.stopPropagation();
 
-                item.addEventListener(
-                    "mouseleave",
-                    () => {
+                    await openRolesFlyout(
+                        rolesButton,
+                        userId
+                    );
+                }
+            );
 
-                        item.style.background =
-                            "transparent";
-                    }
-                );
+            root.appendChild(
+                rolesButton
+            );
 
+            // ------------------------------
+            // CONTROLES DE VOZ
+            // ------------------------------
 
-                item.addEventListener(
-                    "pointerdown",
-                    event => {
+            let adminState = {
+                inVoice:
+                    false,
+                muted:
+                    false,
+                deafened:
+                    false
+            };
 
-                        event.stopPropagation();
-                    }
-                );
-
-
-                item.addEventListener(
-                    "click",
-                    async event => {
-
-                        event.preventDefault();
-                        event.stopPropagation();
-
-
-                        const userId =
-                            voiceAdminPendingUserId;
-
-
-                        if (
-                            !userId
-                        ) {
-                            return;
+            try {
+                const state =
+                    await query(
+                        "voice.getAdminState",
+                        {
+                            userId
                         }
+                    );
 
-
-                        item.disabled =
-                            true;
-
-                        item.style.opacity =
-                            "0.55";
-
-
-                        try {
-
-                            await voiceAdminMutation(
-                                "voice.disconnectUser",
-                                {
-                                    userId
-                                }
-                            );
-
-
-                            voiceAdminToast(
-                                "Usuário desconectado da chamada."
-                            );
-
-
-                            console.log(
-                                "[Voice Admin] usuário desconectado:",
-                                userId
-                            );
-
-                        } catch (
-                            error
-                            ) {
-
-                            const message =
-                                voiceAdminGetErrorText(
-                                    error
-                                );
-
-
-                            voiceAdminToast(
-                                message,
-                                true
-                            );
-
-
-                            console.error(
-                                "[Voice Admin] falha ao desconectar:",
-                                {
-                                    userId,
-                                    error
-                                }
-                            );
-
-
-                            item.disabled =
-                                false;
-
-                            item.style.opacity =
-                                "1";
-                        }
-                    }
-                );
-
-
-                menu.appendChild(
-                    separator
-                );
-
-                menu.appendChild(
-                    item
+                if (
+                    state &&
+                    typeof state ===
+                    "object"
+                ) {
+                    adminState = {
+                        ...adminState,
+                        ...state
+                    };
+                }
+            } catch (
+                error
+                ) {
+                console.warn(
+                    "[Voice Admin] falha ao consultar estado:",
+                    error
                 );
             }
 
+            const muteButton =
+                makeButton(
+                    "Mutar no servidor",
+                    {
+                        checked:
+                            Boolean(
+                                adminState.muted
+                            )
+                    }
+                );
 
-            document.addEventListener(
-                "contextmenu",
-                event => {
+            const deafenButton =
+                makeButton(
+                    "Desativar áudio no servidor",
+                    {
+                        checked:
+                            Boolean(
+                                adminState.deafened
+                            )
+                    }
+                );
 
-                    const row =
-                        voiceAdminFindRow(
-                            event.target
-                        );
+            if (
+                !adminState.inVoice
+            ) {
+                for (
+                    const button
+                    of [
+                    muteButton,
+                    deafenButton
+                ]
+                    ) {
+                    button.disabled =
+                        true;
 
+                    button.style.opacity =
+                        "0.45";
+
+                    button.title =
+                        "Usuário não está em uma chamada.";
+                }
+            }
+
+            muteButton.addEventListener(
+                "click",
+                async event => {
+                    event.preventDefault();
+                    event.stopPropagation();
 
                     if (
-                        !row
+                        muteButton.disabled
                     ) {
-
-                        voiceAdminPendingUserId =
-                            null;
-
-
-                        voiceAdminPendingRow =
-                            null;
-
-
                         return;
                     }
 
-
-                    const userId =
-                        voiceAdminGetUserIdFromRow(
-                            row
+                    const nextMuted =
+                        !Boolean(
+                            adminState.muted
                         );
 
+                    setBusy(
+                        muteButton,
+                        true
+                    );
 
-                    if (
-                        !userId
-                    ) {
-
-                        voiceAdminPendingUserId =
-                            null;
-
-
-                        voiceAdminPendingRow =
-                            null;
-
-
-                        console.warn(
-                            "[Voice Admin] linha de voz encontrada, mas userId não pôde ser identificado."
+                    try {
+                        await mutation(
+                            "voice.setServerMute",
+                            {
+                                userId,
+                                muted:
+                                nextMuted
+                            }
                         );
 
+                        toast(
+                            nextMuted
+                                ? "Usuário mutado no servidor."
+                                : "Mute do servidor removido."
+                        );
 
-                        return;
+                        adminState.muted =
+                            nextMuted;
+
+                        generation += 1;
+
+                        const nextGeneration =
+                            generation;
+
+                        setTimeout(
+                            () =>
+                                installMenu(
+                                    nextGeneration
+                                ),
+                            0
+                        );
+                    } catch (
+                        error
+                        ) {
+                        toast(
+                            getErrorText(
+                                error
+                            ),
+                            true
+                        );
+
+                        setBusy(
+                            muteButton,
+                            false
+                        );
                     }
-
-
-                    voiceAdminPendingUserId =
-                        userId;
-
-
-                    voiceAdminPendingRow =
-                        row;
-
-
-                    setTimeout(
-                        voiceAdminInstallMenuItem,
-                        0
-                    );
-
-
-                    setTimeout(
-                        voiceAdminInstallMenuItem,
-                        35
-                    );
-                },
-                true
+                }
             );
 
+            deafenButton.addEventListener(
+                "click",
+                async event => {
+                    event.preventDefault();
+                    event.stopPropagation();
 
-            console.log(
-                "[Voice Admin] instalado dentro do MAIN WORLD."
+                    if (
+                        deafenButton.disabled
+                    ) {
+                        return;
+                    }
+
+                    const nextDeafened =
+                        !Boolean(
+                            adminState.deafened
+                        );
+
+                    setBusy(
+                        deafenButton,
+                        true
+                    );
+
+                    try {
+                        await mutation(
+                            "voice.setServerDeafen",
+                            {
+                                userId,
+                                deafened:
+                                nextDeafened
+                            }
+                        );
+
+                        toast(
+                            nextDeafened
+                                ? "Áudio do usuário desativado no servidor."
+                                : "Áudio do servidor restaurado."
+                        );
+
+                        adminState.deafened =
+                            nextDeafened;
+
+                        generation += 1;
+
+                        const nextGeneration =
+                            generation;
+
+                        setTimeout(
+                            () =>
+                                installMenu(
+                                    nextGeneration
+                                ),
+                            0
+                        );
+                    } catch (
+                        error
+                        ) {
+                        toast(
+                            getErrorText(
+                                error
+                            ),
+                            true
+                        );
+
+                        setBusy(
+                            deafenButton,
+                            false
+                        );
+                    }
+                }
+            );
+
+            root.append(
+                muteButton,
+                deafenButton
+            );
+
+            // ------------------------------
+            // DESCONECTAR
+            // ------------------------------
+
+            const disconnectButton =
+                makeButton(
+                    "Desconectar da chamada",
+                    {
+                        danger:
+                            true
+                    }
+                );
+
+            if (
+                !adminState.inVoice
+            ) {
+                disconnectButton.disabled =
+                    true;
+
+                disconnectButton.style.opacity =
+                    "0.45";
+
+                disconnectButton.title =
+                    "Usuário não está em uma chamada.";
+            }
+
+            disconnectButton.addEventListener(
+                "click",
+                async event => {
+                    event.preventDefault();
+                    event.stopPropagation();
+
+                    if (
+                        disconnectButton.disabled
+                    ) {
+                        return;
+                    }
+
+                    setBusy(
+                        disconnectButton,
+                        true
+                    );
+
+                    try {
+                        await mutation(
+                            "voice.disconnectUser",
+                            {
+                                userId
+                            }
+                        );
+
+                        toast(
+                            "Usuário desconectado da chamada."
+                        );
+
+                        console.log(
+                            "[Voice Admin] usuário desconectado:",
+                            userId
+                        );
+
+                        closeRolesFlyout();
+                    } catch (
+                        error
+                        ) {
+                        toast(
+                            getErrorText(
+                                error
+                            ),
+                            true
+                        );
+
+                        setBusy(
+                            disconnectButton,
+                            false
+                        );
+                    }
+                }
+            );
+
+            root.appendChild(
+                disconnectButton
+            );
+
+            menu.appendChild(
+                root
             );
         }
 
+        // ==================================================
+        // EVENTOS
+        // ==================================================
+
+        document.addEventListener(
+            "contextmenu",
+            event => {
+                closeRolesFlyout();
+
+                const row =
+                    findVoiceRow(
+                        event.target
+                    );
+
+                if (
+                    !row
+                ) {
+                    pendingUserId =
+                        null;
+
+                    pendingRow =
+                        null;
+
+                    return;
+                }
+
+                const userId =
+                    getUserIdFromRow(
+                        row
+                    );
+
+                if (
+                    !userId
+                ) {
+                    pendingUserId =
+                        null;
+
+                    pendingRow =
+                        null;
+
+                    console.warn(
+                        "[Voice Admin] linha de voz encontrada, mas userId não pôde ser identificado."
+                    );
+
+                    return;
+                }
+
+                pendingUserId =
+                    userId;
+
+                pendingRow =
+                    row;
+
+                generation += 1;
+
+                const currentGeneration =
+                    generation;
+
+                setTimeout(
+                    () =>
+                        installMenu(
+                            currentGeneration
+                        ),
+                    0
+                );
+
+                setTimeout(
+                    () =>
+                        installMenu(
+                            currentGeneration
+                        ),
+                    35
+                );
+            },
+            true
+        );
+
+        document.addEventListener(
+            "pointerdown",
+            event => {
+                const flyout =
+                    document.getElementById(
+                        FLYOUT_ID
+                    );
+
+                if (
+                    flyout &&
+                    !flyout.contains(
+                        event.target
+                    )
+                ) {
+                    closeRolesFlyout();
+                }
+            },
+            true
+        );
+
+        console.log(
+            "[Voice Admin] controles administrativos instalados dentro do MAIN WORLD."
+        );
     }
 });
