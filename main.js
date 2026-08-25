@@ -5,7 +5,8 @@ const {
     session,
     ipcMain,
     dialog,
-    nativeImage
+    nativeImage,
+    shell
 } = require("electron");
 
 
@@ -68,6 +69,23 @@ let pickerReject =
 
 let selectedShareOptions =
     null;
+
+
+// ======================================================
+// RELEASE SECURITY V2.0.0
+// ======================================================
+
+let pendingMainServerOrigin =
+    null;
+
+let approvedProcessAudioSourceId =
+    null;
+
+let approvedProcessAudioUntil =
+    0;
+
+const PROCESS_AUDIO_APPROVAL_TTL_MS =
+    60 * 1000;
 
 
 // ======================================================
@@ -315,15 +333,30 @@ function patchUpdaterUiState(
 
 ipcMain.handle(
     "updater:get-state",
-    async () => ({
-        state: updaterUiState
-    })
+    async event => {
+
+        assertTrustedMainRenderer(
+            event,
+            "updater:get-state"
+        );
+
+
+        return {
+            state: updaterUiState
+        };
+    }
 );
 
 
 ipcMain.handle(
     "updater:check",
-    async () => {
+    async event => {
+
+        assertTrustedMainRenderer(
+            event,
+            "updater:check"
+        );
+
 
         if (
             !app.isPackaged
@@ -373,7 +406,13 @@ ipcMain.handle(
 
 ipcMain.handle(
     "updater:download",
-    async () => {
+    async event => {
+
+        assertTrustedMainRenderer(
+            event,
+            "updater:download"
+        );
+
 
         if (
             !app.isPackaged
@@ -422,7 +461,13 @@ ipcMain.handle(
 
 ipcMain.handle(
     "updater:install",
-    async () => {
+    async event => {
+
+        assertTrustedMainRenderer(
+            event,
+            "updater:install"
+        );
+
 
         if (
             !app.isPackaged
@@ -1034,6 +1079,11 @@ async function startProcessAudio(
     stopProcessAudio();
 
 
+    consumeProcessAudioApproval(
+        sourceId
+    );
+
+
     if (
         process.platform !==
         "win32"
@@ -1420,9 +1470,14 @@ async function startProcessAudio(
 ipcMain.handle(
     "process-audio:start",
     async (
-        _event,
+        event,
         sourceId
     ) => {
+
+        assertTrustedMainRenderer(
+            event,
+            "process-audio:start"
+        );
 
         console.log(
             "[Process Audio] start solicitado:",
@@ -1440,9 +1495,14 @@ ipcMain.handle(
 ipcMain.handle(
     "process-audio:stop",
     async (
-        _event,
+        event,
         captureId
     ) => {
+
+        assertTrustedMainRenderer(
+            event,
+            "process-audio:stop"
+        );
 
         console.log(
             "[Process Audio] stop solicitado:",
@@ -1761,6 +1821,350 @@ function normalizeServerUrl(
 
 
     return parsed.origin;
+}
+
+
+// ======================================================
+// RELEASE SECURITY HELPERS V2.0.0
+// ======================================================
+
+function getOriginSafe(
+    value
+) {
+
+    try {
+
+        const parsed =
+            new URL(
+                String(
+                    value ||
+                    ""
+                )
+            );
+
+
+        if (
+            parsed.protocol !== "http:" &&
+            parsed.protocol !== "https:"
+        ) {
+
+            return null;
+        }
+
+
+        return parsed.origin;
+
+    } catch {
+
+        return null;
+    }
+}
+
+
+function getApprovedServerOrigins() {
+
+    const origins =
+        new Set();
+
+
+    try {
+
+        const config =
+            readServerConfig();
+
+
+        const values = [
+            config.server,
+            ...Object.keys(
+                config.servers ||
+                {}
+            )
+        ];
+
+
+        for (
+            const value
+            of values
+        ) {
+
+            const origin =
+                getOriginSafe(
+                    value
+                );
+
+
+            if (
+                origin
+            ) {
+
+                origins.add(
+                    origin
+                );
+            }
+        }
+
+    } catch {}
+
+
+    if (
+        pendingMainServerOrigin
+    ) {
+
+        origins.add(
+            pendingMainServerOrigin
+        );
+    }
+
+
+    return origins;
+}
+
+
+function isApprovedMainRendererUrl(
+    value
+) {
+
+    const url =
+        String(
+            value ||
+            ""
+        );
+
+
+    if (
+        url.startsWith(
+            "data:text/html"
+        )
+    ) {
+
+        return true;
+    }
+
+
+    const origin =
+        getOriginSafe(
+            url
+        );
+
+
+    if (
+        !origin
+    ) {
+
+        return false;
+    }
+
+
+    if (
+        getApprovedServerOrigins()
+            .has(
+                origin
+            )
+    ) {
+
+        return true;
+    }
+
+
+    try {
+
+        const currentUrl =
+            mainWindow &&
+            !mainWindow.isDestroyed()
+                ? mainWindow.webContents
+                    .getURL()
+                : "";
+
+
+        const current =
+            new URL(
+                currentUrl
+            );
+
+        const target =
+            new URL(
+                url
+            );
+
+
+        return (
+            current.hostname ===
+                target.hostname &&
+            current.protocol ===
+                "http:" &&
+            target.protocol ===
+                "https:"
+        );
+
+    } catch {
+
+        return false;
+    }
+}
+
+
+function assertTrustedMainRenderer(
+    event,
+    channel
+) {
+
+    if (
+        !event ||
+        !mainWindow ||
+        mainWindow.isDestroyed() ||
+        event.sender !==
+            mainWindow.webContents
+    ) {
+
+        throw new Error(
+            `IPC bloqueado (${channel}): renderer nao autorizado.`
+        );
+    }
+
+
+    const senderUrl =
+        event.senderFrame?.url ||
+        event.sender.getURL();
+
+
+    if (
+        !isApprovedMainRendererUrl(
+            senderUrl
+        )
+    ) {
+
+        console.warn(
+            "[Security] IPC bloqueado por origem:",
+            channel,
+            senderUrl
+        );
+
+
+        throw new Error(
+            `IPC bloqueado (${channel}): origem nao autorizada.`
+        );
+    }
+}
+
+
+function assertTrustedServerConnectRenderer(
+    event
+) {
+
+    const fromMain =
+        mainWindow &&
+        !mainWindow.isDestroyed() &&
+        event?.sender ===
+            mainWindow.webContents;
+
+
+    const fromPicker =
+        serverWindow &&
+        !serverWindow.isDestroyed() &&
+        event?.sender ===
+            serverWindow.webContents;
+
+
+    if (
+        fromMain
+    ) {
+
+        assertTrustedMainRenderer(
+            event,
+            "server:connect"
+        );
+
+
+        return;
+    }
+
+
+    if (
+        fromPicker
+    ) {
+
+        return;
+    }
+
+
+    throw new Error(
+        "IPC bloqueado (server:connect): renderer nao autorizado."
+    );
+}
+
+
+function approveProcessAudioSource(
+    sourceId,
+    audioMode
+) {
+
+    const normalized =
+        String(
+            sourceId ||
+            ""
+        );
+
+
+    if (
+        audioMode === "process" &&
+        normalized.startsWith(
+            "window:"
+        )
+    ) {
+
+        approvedProcessAudioSourceId =
+            normalized;
+
+        approvedProcessAudioUntil =
+            Date.now() +
+            PROCESS_AUDIO_APPROVAL_TTL_MS;
+
+
+        return;
+    }
+
+
+    approvedProcessAudioSourceId =
+        null;
+
+    approvedProcessAudioUntil =
+        0;
+}
+
+
+function consumeProcessAudioApproval(
+    sourceId
+) {
+
+    const normalized =
+        String(
+            sourceId ||
+            ""
+        );
+
+
+    const allowed =
+        approvedProcessAudioSourceId ===
+            normalized &&
+        Date.now() <=
+            approvedProcessAudioUntil;
+
+
+    approvedProcessAudioSourceId =
+        null;
+
+    approvedProcessAudioUntil =
+        0;
+
+
+    if (
+        !allowed
+    ) {
+
+        throw new Error(
+            "Process Audio bloqueado: selecione novamente a janela pelo picker."
+        );
+    }
 }
 
 
@@ -2737,9 +3141,18 @@ async function loadServerInMainWindow(
     createMainWindow();
 
 
+    pendingMainServerOrigin =
+        serverUrl;
+
+
     try {
 
         await mainWindow.loadURL(
+            serverUrl
+        );
+
+
+        saveServer(
             serverUrl
         );
 
@@ -2752,12 +3165,12 @@ async function loadServerInMainWindow(
 
 
         throw error;
+
+    } finally {
+
+        pendingMainServerOrigin =
+            null;
     }
-
-
-    saveServer(
-        serverUrl
-    );
 
 
     try {
@@ -2995,7 +3408,7 @@ function createMainWindow() {
 
             titleBarOverlay: {
                 color:
-                    "#2b171c",
+                    "#00000000",
 
                 symbolColor:
                     "#f2f3f5",
@@ -3032,6 +3445,114 @@ function createMainWindow() {
     attachSharkordWebSocketLogger(
         mainWindow
     );
+
+
+    mainWindow.webContents.on(
+        "will-navigate",
+        (
+            event,
+            targetUrl
+        ) => {
+
+            if (
+                isApprovedMainRendererUrl(
+                    targetUrl
+                )
+            ) {
+
+                return;
+            }
+
+
+            event.preventDefault();
+
+
+            console.warn(
+                "[Security] navegacao bloqueada:",
+                targetUrl
+            );
+
+
+            if (
+                getOriginSafe(
+                    targetUrl
+                )
+            ) {
+
+                shell.openExternal(
+                    targetUrl
+                ).catch(
+                    () => {}
+                );
+            }
+        }
+    );
+
+
+    mainWindow.webContents.on(
+        "will-redirect",
+        (
+            event,
+            targetUrl
+        ) => {
+
+            if (
+                isApprovedMainRendererUrl(
+                    targetUrl
+                )
+            ) {
+
+                pendingMainServerOrigin =
+                    getOriginSafe(
+                        targetUrl
+                    );
+
+
+                return;
+            }
+
+
+            event.preventDefault();
+
+
+            console.warn(
+                "[Security] redirect bloqueado:",
+                targetUrl
+            );
+        }
+    );
+
+
+    mainWindow.webContents
+        .setWindowOpenHandler(
+            details => {
+
+                const targetUrl =
+                    String(
+                        details?.url ||
+                        ""
+                    );
+
+
+                if (
+                    getOriginSafe(
+                        targetUrl
+                    )
+                ) {
+
+                    shell.openExternal(
+                        targetUrl
+                    ).catch(
+                        () => {}
+                    );
+                }
+
+
+                return {
+                    action: "deny"
+                };
+            }
+        );
 
 
     mainWindow.webContents.on(
@@ -3140,7 +3661,12 @@ function createMainWindow() {
 
 ipcMain.handle(
     "server-sidebar:get-state",
-    async () => {
+    async event => {
+
+        assertTrustedMainRenderer(
+            event,
+            "server-sidebar:get-state"
+        );
 
         return getServerSidebarState();
     }
@@ -3150,9 +3676,14 @@ ipcMain.handle(
 ipcMain.handle(
     "server-sidebar:connect",
     async (
-        _event,
+        event,
         input
     ) => {
+
+        assertTrustedMainRenderer(
+            event,
+            "server-sidebar:connect"
+        );
 
         return loadServerInMainWindow(
             input
@@ -3164,9 +3695,14 @@ ipcMain.handle(
 ipcMain.handle(
     "server-sidebar:remove",
     async (
-        _event,
+        event,
         input
     ) => {
+
+        assertTrustedMainRenderer(
+            event,
+            "server-sidebar:remove"
+        );
 
         const result =
             removeSavedServer(
@@ -3297,9 +3833,14 @@ ipcMain.handle(
 ipcMain.handle(
     "server-sidebar:add",
     async (
-        _event,
+        event,
         input
     ) => {
+
+        assertTrustedMainRenderer(
+            event,
+            "server-sidebar:add"
+        );
 
         /*
          * "Adicionar" também conecta.
@@ -3369,6 +3910,11 @@ ipcMain.handle(
         event,
         options
     ) => {
+
+        assertTrustedMainRenderer(
+            event,
+            "server:branding:choose-image"
+        );
 
         const serverUrl =
             normalizeServerUrl(
@@ -3544,9 +4090,14 @@ ipcMain.handle(
 ipcMain.handle(
     "server:branding:remove-image",
     async (
-        _event,
+        event,
         options
     ) => {
+
+        assertTrustedMainRenderer(
+            event,
+            "server:branding:remove-image"
+        );
 
         return removeServerImage(
             options?.serverUrl,
@@ -3559,9 +4110,13 @@ ipcMain.handle(
 ipcMain.handle(
     "server:connect",
     async (
-        _event,
+        event,
         input
     ) => {
+
+        assertTrustedServerConnectRenderer(
+            event
+        );
 
         const result =
             await loadServerInMainWindow(
@@ -3738,6 +4293,12 @@ function cancelPicker() {
         null;
 
 
+    approveProcessAudioSource(
+        null,
+        "none"
+    );
+
+
     if (
         reject
     ) {
@@ -3770,7 +4331,12 @@ function cancelPicker() {
 
 ipcMain.handle(
     "screenshare:choose-source",
-    async () => {
+    async event => {
+
+        assertTrustedMainRenderer(
+            event,
+            "screenshare:choose-source"
+        );
 
         if (
             pickerResolve ||
@@ -4037,6 +4603,12 @@ ipcMain.on(
         };
 
 
+        approveProcessAudioSource(
+            sourceId,
+            audioMode
+        );
+
+
         const result = {
             sourceId,
             audioMode
@@ -4111,6 +4683,22 @@ function configureDisplayMediaHandler() {
                     "getDisplayMedia real:",
                     request.securityOrigin
                 );
+
+
+                if (
+                    !isApprovedMainRendererUrl(
+                        request.securityOrigin
+                    )
+                ) {
+
+                    console.error(
+                        "[Security] getDisplayMedia bloqueado por origem:",
+                        request.securityOrigin
+                    );
+
+
+                    return;
+                }
 
 
                 if (

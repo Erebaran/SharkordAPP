@@ -1,6 +1,6 @@
 {
   "name": "sharkord-desktop",
-  "version": "1.0.7",
+  "version": "2.0.0",
   "description": "Sharkord Desktop",
   "main": "main.js",
   "scripts": {
