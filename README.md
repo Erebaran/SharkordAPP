@@ -1,49 +1,51 @@
 # Sharkord Desktop
 
-Cliente desktop customizado baseado no Sharkord, desenvolvido para oferecer uma experiência integrada com uma versão modificada do servidor e da interface web do Sharkord.
+A desktop client for [SharkordCustom](https://github.com/Erebaran/SharkordCustom), built with Electron to provide a more integrated desktop experience for Sharkord.
 
-> Este projeto utiliza uma versão customizada do Sharkord e não representa o cliente oficial do projeto original.
+> Sharkord Desktop is designed to work with SharkordCustom, a customized version of the original Sharkord project.
 
-## Sobre o projeto
+## About
 
-O Sharkord Desktop é um aplicativo para Windows criado em Electron que funciona em conjunto com uma versão personalizada do Sharkord.
+Sharkord Desktop brings the Sharkord experience to a dedicated Windows application and adds desktop-specific integrations such as screen sharing, system audio capture, server management, native window controls, and other Electron-based features.
 
-Além de empacotar o Sharkord como aplicativo desktop, esta versão adiciona integrações e mudanças próprias de interface, navegação, compartilhamento de tela, áudio e gerenciamento de servidores.
+The application is primarily designed to work alongside:
 
-## Principais recursos
+[SharkordCustom](https://github.com/Erebaran/SharkordCustom)
 
-- Cliente desktop nativo para Windows
-- Compatibilidade com a versão customizada do Sharkord
-- Lista e troca rápida entre servidores
-- Direct Messages integradas ao Dock de servidores
-- Compartilhamento de tela com seletor próprio
-- Compartilhamento de áudio do sistema
-- Controles de voz integrados
-- Top Bar e Dock personalizados
-- Suporte a cor sólida e gradiente na interface
-- Integração com logo, nome e banner do servidor
-- User Settings e Server Settings redesenhados
-- Atualização automática pelo GitHub Releases
-- Melhorias de segurança para navegação e comunicação entre o Electron e o conteúdo carregado
+Some features available in Sharkord Desktop depend on changes implemented in SharkordCustom and may not work correctly with a standard Sharkord installation.
 
-## Sharkord customizado
+## Features
 
-Este aplicativo foi desenvolvido para trabalhar com uma versão modificada do Sharkord.
+- Native desktop client for Windows
+- Multiple server management
+- Quick server switching
+- Direct Messages integration
+- Screen sharing
+- System audio sharing
+- Voice controls
+- Custom Top Bar and server Dock
+- Interface color and gradient customization
+- Server branding integration
+- Redesigned User Settings and Server Settings
+- GitHub Releases auto-update support
+- Improved Electron navigation and IPC security
 
-Algumas funcionalidades presentes no Sharkord Desktop dependem dessas modificações no cliente web e/ou servidor e, por isso, podem não funcionar corretamente com uma instalação padrão do Sharkord.
+## SharkordCustom
 
-As customizações incluem alterações de layout, integração com o Electron, gerenciamento de múltiplos servidores, Direct Messages, compartilhamento de tela e áudio, branding e outras melhorias específicas desta versão.
+Sharkord Desktop is developed alongside
+[SharkordCustom](https://github.com/Erebaran/SharkordCustom).
 
-## Projeto original
+SharkordCustom contains the server and web client modifications required by some of the desktop application's features, including UI changes, desktop integrations, screen and audio sharing improvements, branding, server management, and other custom functionality.
 
-O Sharkord Desktop é baseado e integrado ao projeto Sharkord.
+## Base Project
 
-Os créditos pelo projeto original pertencem aos respectivos autores e colaboradores do Sharkord.
+SharkordCustom is based on the original
+[Sharkord](https://github.com/Sharkord/sharkord) project.
 
-Este repositório contém o cliente Desktop e as adaptações necessárias para sua integração com a versão customizada utilizada pelo aplicativo.
+All credits for the original Sharkord project belong to its original authors and contributors.
 
-## Versão
+> Sharkord Desktop and SharkordCustom are independent modifications and are not official Sharkord projects.
 
-Versão atual:
+## Current Version
 
 `2.0.0`
